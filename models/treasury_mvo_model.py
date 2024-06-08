@@ -68,7 +68,7 @@ class mvo_model():
         ]
         
         # Add upper bound constraint for weights
-        constraints.append(weights <= 0.3)  # The upper bound for each weight is 1
+        constraints.append(weights <= 0.5)  # The upper bound for each weight is 1
         
         # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:
@@ -117,13 +117,36 @@ class mvo_model():
         data = data.loc[(data.index >= data_start) & (data.index <= self.end_date)]
         rebalanced_data = data.copy()
         
-        initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
-        current_composition = initial_composition.copy()
+        # Calculate the initial optimal weights
+        historical_returns = np.log(data[:data.index.get_loc(self.start_date)][[f'DAILY_PRICE_{asset}' for asset in all_assets]].pct_change().dropna() + 1)
+        print(f"Initial historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
     
+        if historical_returns.shape[0] > 0 and historical_returns.shape[1] > 0:
+            sortino_ratios = historical_returns.apply(self.calculate_sortino_ratio)
+            print("Initial sortino ratios", sortino_ratios)
+        
+            if not sortino_ratios.isnull().any():
+                eth_index = np.where(all_assets == 'ETH')[0][0]
+                initial_optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index)
+                print('Initial optimal weights', initial_optimal_weights)
+                
+                if initial_optimal_weights is not None:
+                    # Set the initial composition to the initial optimal weights
+                    initial_composition = initial_optimal_weights
+                else:
+                    print("No initial optimal weights found, using initial composition from data")
+                    initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
+            else:
+                print("Sortino ratios contain NaN, using initial composition from data")
+                initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
+        else:
+            print("No returns available for initial historical period, using initial composition from data")
+            initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
+    
+        current_composition = initial_composition.copy()
         start_index = data.index.get_loc(self.start_date)
         print('start index', start_index)
-        eth_index = np.where(all_assets == 'ETH')[0][0]
-    
+        
         for start in range(start_index, len(data)):
             end = start + 1
             period_data = data[start:end]
@@ -174,6 +197,6 @@ class mvo_model():
     
             rebalanced_data.loc[period_data.index, [f'COMPOSITION_{asset}' for asset in all_assets]] = current_composition
         
-        rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date ].iloc[:-1]
+        rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
         
         return rebalanced_data
