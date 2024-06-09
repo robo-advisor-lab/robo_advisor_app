@@ -378,7 +378,7 @@ with tabs[0]:
     ### Resources
 
     - For more information on the indicies:
-        - Defi and non-defi Treasury indicies can be found at this [flipside dashboard](https://flipsidecrypto.xyz/Brandyn/dao-treasury-returns-Y2F8vX).
+        - DeFi and Non-DeFi Treasury indicies can be found at this [flipside dashboard](https://flipsidecrypto.xyz/Brandyn/dao-treasury-returns-Y2F8vX).
         - [Sirloin Index](https://dune.com/queries/2233092) can be found here.  Accompanying dashboard for DAO Benchmarks [here](https://dune.com/steakhouse/howmuchubench) 
     
     - [GitHub Repository for Vault Advisor](https://github.com/BrandynHamilton/mkrdao_port_mgmt)
