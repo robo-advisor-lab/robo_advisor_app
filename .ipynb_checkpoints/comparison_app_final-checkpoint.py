@@ -282,7 +282,7 @@ if agent_class == "Treasury":
         st.sidebar.write(f"Adding ETH to portfolio...")
         selected_assets.append('ETH')
     
-    eth_bound = st.sidebar.number_input('ETH bound', min_value=0.0, max_value=0.5, value=0.2)
+    eth_bound = st.sidebar.number_input('ETH bound', min_value=0.0, max_value=1.0, value=0.2)
     
 
     
@@ -376,6 +376,10 @@ with tabs[0]:
     - **Performance Metrics**: Displays key metrics such as Sortino ratios, cumulative returns, and portfolio values.
     
     ### Resources
+
+    - For more information on the indicies:
+        - Defi and non-defi Treasury indicies can be found at this [flipside dashboard](https://flipsidecrypto.xyz/Brandyn/dao-treasury-returns-Y2F8vX).
+        - [Sirloin Index](https://dune.com/queries/2233092) can be found here.  Accompanying dashboard for DAO Benchmarks [here](https://dune.com/steakhouse/howmuchubench) 
     
     - [GitHub Repository for Vault Advisor](https://github.com/BrandynHamilton/mkrdao_port_mgmt)
     - [GitHub Repository for Treasury Advisor](https://github.com/BrandynHamilton/treasury_advisor)
