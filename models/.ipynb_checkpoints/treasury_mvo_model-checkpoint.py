@@ -67,8 +67,10 @@ class mvo_model():
             weights >= 0
         ]
         
-        # Add upper bound constraint for weights
-        constraints.append(weights <= 0.5)  # The upper bound for each weight is 1
+        upper_bound = 0.5 if n == 2 else 0.3
+    
+    # Add upper bound constraint for weights
+        constraints.append(weights <= upper_bound)
         
         # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:

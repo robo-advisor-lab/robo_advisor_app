@@ -13,12 +13,17 @@ from sklearn.linear_model import LinearRegression
 from scripts.treasury_utils import calculate_sortino_ratio, mvo, calculate_log_returns
 
 class mvo_model():
-    def __init__(self, eth_bound, current_risk_free, start_date, end_date, threshold=0):
+    def __init__(self, eth_bound, current_risk_free, start_date, end_date, threshold=0, upper_bound=None):
         self.threshold = threshold
         self.current_risk_free = current_risk_free
         self.start_date = start_date
         self.end_date = end_date 
         self.eth_bound = eth_bound
+        self.upper_bound = upper_bound if upper_bound is not None else 1  # Default to 1 if upper_bound is not provided
+
+        
+    def is_feasible(self, num_assets):
+        return num_assets * self.upper_bound >= 1
     
     def calculate_sortino_ratio(self, returns):
         risk_free = self.current_risk_free
@@ -41,6 +46,14 @@ class mvo_model():
     
     def mvo_sortino(self, returns, sortino_ratios, eth_index):
         n = returns.shape[1]
+        
+        print('length of returns', n )
+        
+        # Check if the problem is feasible
+        if not self.is_feasible(n ):
+            print("The upper bounds are too strict and make the problem infeasible.")
+            return None
+        
         print('n for weights', n)
         
         # Validate the shape and content of returns and sortino_ratios
@@ -67,10 +80,8 @@ class mvo_model():
             weights >= 0
         ]
         
-        upper_bound = 0.5 if n == 2 else 0.3
-    
-    # Add upper bound constraint for weights
-        constraints.append(weights <= upper_bound)
+        # Use the upper_bound provided by the user
+        constraints.append(weights <= self.upper_bound)
         
         # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:
@@ -114,6 +125,7 @@ class mvo_model():
     
     def rebalance(self, data, all_assets, rebalancing_frequency=7):
         all_assets = np.array(all_assets)
+        #num_assets = len(all_assets)
         data_start = data.index.min()
         data = data.sort_index()
         data = data.loc[(data.index >= data_start) & (data.index <= self.end_date)]

@@ -142,12 +142,16 @@ class PortfolioEnv(gym.Env):
         self.portfolio = normalize_portfolio(self.portfolio)
 
         self.composition_log.append((self.data.index[self.current_step], self.portfolio.copy()))
+
+        #self.portfolio = normalize_portfolio(self.portfolio)
+        print('mvo log returns', log_returns)
+        print('portfolio', self.portfolio)
         
         portfolio_return = np.sum(log_returns * self.portfolio)
 
         self.returns_log.append((self.data.index[self.current_step], portfolio_return))
 
-        if len(self.returns_log) > 2:
+        if len(self.returns_log) > 0:
             sortino_ratio = calculate_sortino_ratio([r for _, r in self.returns_log], self.risk_free)
         else:
             sortino_ratio = 0

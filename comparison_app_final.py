@@ -33,11 +33,20 @@ from scripts.simulation import RL_VaultSimulator
 from scripts.environment import SimulationEnvironment
 from scripts.vault_data_processing import test_data, targets, features, temporals, dai_ceilings, vault_names, key_mapping
 from scripts.vault_utils import mvo, historical_sortino, visualize_mvo_results, evaluate_predictions, generate_action_space, calc_cumulative_return, evaluate_multi_predictions, abbreviate_number
+import random
+import torch
+
 
 # Set random seeds
-random_seed = st.sidebar.selectbox('Select Random Seed', [20, 42, 100, 200])
-np.random.seed(random_seed)
-tf.random.set_seed(random_seed)
+random_seed = st.sidebar.selectbox('Select Random Seed', [20, 42, 100, 200], index = 2)
+def set_random_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
 
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
@@ -204,6 +213,7 @@ vaults = ['BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_c
 
 # Simulation function
 def run_simulation(agent_class, eth_bound=None, rebalance_frequency=None, start_date=None, end_date=None, user_bounds=None):
+    set_random_seed(random_seed)
     if agent_class == "Treasury":
         st.sidebar.write("Running Treasury Advisor...")
 
@@ -261,7 +271,7 @@ vault_min_end_date = simulation_data.index.max().date()
 
 # Add rebalance frequency input only for Treasury Advisor
 if agent_class == "Treasury":
-    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=5)
+    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=30)
     initial_amount = st.sidebar.number_input('Initial Amount (USD)', value=100)
     selected_assets = st.sidebar.multiselect(
         'Select assets to include in the Treasury Advisor:',
@@ -283,6 +293,7 @@ if agent_class == "Treasury":
     treasury_starting_date = datetime.combine(treasury_starting_date, datetime.min.time())
     treasury_ending_date = datetime.combine(treasury_ending_date, datetime.min.time())
     treasury_ending_date = treasury_ending_date + timedelta(days=1)
+    bounds = st.session_state['vault_bounds']
 
     #st.write(treasury_starting_date)
     
@@ -295,7 +306,7 @@ if agent_class == "Treasury":
     
     
 else:
-    rebalance_frequency = 5
+    rebalance_frequency = 30
     initial_amount = 100
     selected_assets = mvo_combined_assets if 'treasury_rl' not in st.session_state or 'treasury_mvo' not in st.session_state else st.session_state['selected_assets']
     eth_bound = 0
@@ -304,8 +315,8 @@ else:
     def get_user_bounds(vaults):
         bounds = {}
         for vault in vaults:
-            lower_bound = st.sidebar.number_input(f"Lower bound for {vault} ", min_value=0.0, max_value=1.0, value=0.05, step=0.01)
-            upper_bound = st.sidebar.number_input(f"Upper bound for {vault} ", min_value=0.0, max_value=1.0, value=0.3, step=0.01)
+            lower_bound = st.sidebar.number_input(f"Lower bound for {vault} ", min_value=0.05, max_value=0.3, value=0.05, step=0.01)
+            upper_bound = st.sidebar.number_input(f"Upper bound for {vault} ", min_value=0.2, max_value=1.0, value=0.2, step=0.01)
             bounds[vault] = (lower_bound, upper_bound)
         return bounds
 
@@ -410,7 +421,7 @@ with tabs[1]:
             rl_combined_data.index = rl_combined_data.index.tz_localize(None)
             rl_sim_w_RWA = rl_combined_data.merge(test_data['RWA Vault_collateral_usd'], left_index=True, right_index=True, how='left')
             rl_sim_w_RWA.sort_index(inplace=True)
-            rl_portfolio_mvo_weights, rl_portfolio_returns, rl_portfolio_composition, rl_total_portfolio_value = mvo(rl_sim_w_RWA, st.session_state['vault_bounds'])
+            rl_portfolio_mvo_weights, rl_portfolio_returns, rl_portfolio_composition, rl_total_portfolio_value = mvo(rl_sim_w_RWA, bounds)
             rl_sim_portfolio_daily_returns,  rl_sim_downside_returns, rl_sim_excess_returns, rl_sim_sortino_ratio = historical_sortino(rl_portfolio_returns,rl_portfolio_composition)
             rl_optimized_returns = calc_cumulative_return(rl_sim_portfolio_daily_returns)
             rl_optimized_returns = rl_optimized_returns[~rl_optimized_returns.index.duplicated(keep='first')]
@@ -1334,6 +1345,3 @@ with tabs[2]:
         
         
         st.plotly_chart(fig)
-
-
-

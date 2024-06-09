@@ -13,3 +13,4 @@ plotly>=5.3.0
 gymnasium>=0.26.0
 stable-baselines3>=1.2.0
 cvxpy>=1.1.15
+torch>=1.10.0  
