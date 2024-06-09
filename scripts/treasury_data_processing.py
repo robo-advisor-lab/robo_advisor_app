@@ -406,7 +406,7 @@ print('panamadao assets', panama_dao_assets)
 
 # Combine both arrays using np.concatenate and remove duplicates using np.unique
 combined_assets = np.unique(np.concatenate((all_assets, panama_dao_assets)))
-combined_assets = [asset for asset in combined_assets if asset != 'HOP']
+combined_assets = [asset for asset in combined_assets if asset not in ['HOP', 'ARB']]
 
 
 print('combined assets', combined_assets)

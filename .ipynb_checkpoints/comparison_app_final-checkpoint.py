@@ -271,7 +271,7 @@ vault_min_end_date = simulation_data.index.max().date()
 
 # Add rebalance frequency input only for Treasury Advisor
 if agent_class == "Treasury":
-    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=30)
+    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=7)
     initial_amount = st.sidebar.number_input('Initial Amount (USD)', value=100)
     selected_assets = st.sidebar.multiselect(
         'Select assets to include in the Treasury Advisor:',
@@ -282,7 +282,7 @@ if agent_class == "Treasury":
         st.sidebar.write(f"Adding ETH to portfolio...")
         selected_assets.append('ETH')
     
-    eth_bound = st.sidebar.number_input('ETH bound', min_value=0.0, max_value=1.0, value=0.2)
+    eth_bound = st.sidebar.number_input('ETH bound', min_value=0.0, max_value=0.5, value=0.2)
     
 
     
@@ -352,8 +352,8 @@ with tabs[0]:
     
     This application is designed to help you manage and optimize your portfolio using advanced financial models and machine learning techniques. The app provides two main advisors:
     
-    1. **Vault Robo Advisor**: Manages individual vaults, optimizing their asset composition and rebalancing based on predefined strategies.
-    2. **Treasury Robo Advisor**: Manages the overall treasury, optimizing the asset allocation and rebalancing to maximize returns while minimizing risk.
+    1. **Vault Robo Advisor**: Manages individual vaults, optimizing their asset composition and rebalancing based on predefined strategies.  Trained on and backtested to MakerDAO data.
+    2. **Treasury Robo Advisor**: Manages the overall treasury, optimizing the asset allocation and rebalancing to maximize returns while minimizing risk.  Backtested on PanamaDAO data.  
     
     ### How to Use
     
@@ -387,6 +387,7 @@ with tabs[0]:
 
 with tabs[1]:
     st.header("Vault Robo Advisor")
+    st.markdown("**Backtesting to MakerDAO Historical Data**")
     
     if 'vault_rl' in st.session_state or 'vault_mvo' in st.session_state:
         st.write('Chosen Vault Bounds:')
@@ -674,6 +675,7 @@ with tabs[1]:
 
 with tabs[2]:
     st.header("Treasury Robo Advisor")
+    st.markdown("**Backtesting to PanamaDAO Historical Data**")
     #st.write('Selected Assets:', selected_assets)
     #st.write('ETH Bound', eth_bound)
     if 'treasury_rl' in st.session_state or 'treasury_mvo' in st.session_state:

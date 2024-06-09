@@ -67,14 +67,12 @@ class mvo_model():
             weights >= 0
         ]
         
-        upper_bound = 0.5 if n == 2 else 0.3
-    
-    # Add upper bound constraint for weights
-        constraints.append(weights <= upper_bound)
+        constraints.append(weights <= 0.5)  # The upper bound for each weight is 1
         
         # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:
             constraints.append(weights[eth_index] >= self.eth_bound)
+
         
         # Log constraints for debugging
         print(f'Constraints: {constraints}')
@@ -90,6 +88,7 @@ class mvo_model():
             return weights.value
         else:
             return None
+
 
     def rebalance_portfolio(self, data, weights):
         compositions = np.outer(np.ones(len(data)), weights)
