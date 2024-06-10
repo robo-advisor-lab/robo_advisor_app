@@ -124,7 +124,10 @@ class RL_VaultSimulator:
     
             volatilities = self.calculate_historical_volatility()
             predictions = self.forecast(X_test, volatilities)
+            print('predictions',predictions)
+            #print('predcitions nan', predictions.isna().sum().sum())
             future_index = pd.DatetimeIndex([self.current_date])
+            print('future index', future_index)
             self.update_state(future_index, predictions)
     
             # Update the DAI ceilings history right after updating the state
@@ -148,7 +151,7 @@ class RL_VaultSimulator:
 
 
     def apply_action(self, action):
-        base_value_if_zero = 10000  # Base value to set if the initial DAI ceiling is zero
+        base_value_if_zero = 5000000  # Base value to set if the initial DAI ceiling is zero
         if action:
             for vault, percentage_change in action.items():
                 # Append the suffix '_dai_ceiling' to the vault name to match the DataFrame columns
@@ -177,24 +180,31 @@ class RL_VaultSimulator:
         predictions = np.maximum(predictions, 0)  # Ensure predictions are non-negative before adjustment
         
         # Scale factor for volatility should be set based on historical volatility analysis
-        #try different scale factor; optimal @ 500000000 or 4, 453000000, 467000000
         scale_factor = self.scale_factor  # This should be calibrated based on your data
         noise = np.random.normal(0, volatilities * scale_factor, predictions.shape)
         
         # Apply noise and ensure predictions do not fall below a realistic minimum
-        # Example: Set a floor at 1% of the mean historical asset value or a fixed value known to be a plausible minimum
-        #0.2, 0.15 optimal, 0.12
-        minimum_value =  self.minimum_value_factor * self.initial_data[self.targets].mean()  # This is an example and should be adjusted
+        minimum_value = self.minimum_value_factor * self.initial_data[self.targets].mean()  # This is an example and should be adjusted
         adjusted_predictions = np.maximum(predictions + noise, minimum_value)
+        print('before lp adjusted predictions', adjusted_predictions)
+        # Apply specific adjustments for the LP vault
+        lp_vault_index = self.targets.index('LP Vault_collateral_usd')
+        if lp_vault_index is not None:
+            # Apply a different volatility adjustment or cap the volatility for the LP vault
+            #lp vol @ 0.89
+            lp_volatility_cap = volatilities[lp_vault_index] * scale_factor * 0.5  # Example adjustment
+            lp_noise = np.random.normal(0, lp_volatility_cap, adjusted_predictions[:, lp_vault_index].shape)
+            adjusted_predictions[:, lp_vault_index] = np.maximum(predictions[:, lp_vault_index] + lp_noise, minimum_value[lp_vault_index])
+
+        print('after lp adjusted predictions', adjusted_predictions)
         
         return adjusted_predictions
+
         # try scale 453000000, min val .12 or .1, window 25 or 15
 
 
-    def calculate_historical_volatility(self): #try 365 for straightish lines, maybe try longer?
-        # try different window; optimal @ 280, 25, 15, 380, 360
-        # 180, 150 also good, 60 for smaller scale and min val
-        window=self.volatility_window
+    def calculate_historical_volatility(self):
+        window = self.volatility_window
     
         # Assuming daily data, calculate percentage change
         daily_returns = self.data[self.targets].pct_change()
@@ -204,6 +214,18 @@ class RL_VaultSimulator:
     
         # Calculate volatility as the standard deviation of returns
         volatility = daily_returns.rolling(window=window, min_periods=1).std()
+        print('all vol before', volatility.describe())
+    
+        # Adjust volatility for the LP vault
+        lp_vault = 'LP Vault_collateral_usd'
+        print('lp vol before', volatility[lp_vault])
+        if lp_vault in volatility.columns:
+            # Apply a different scale factor or adjustment for the LP vault
+            lp_scale_factor = 0.5  # Example adjustment factor, you can tweak this value
+            volatility[lp_vault] *= lp_scale_factor
+            print('lp vol', volatility[lp_vault])
+
+        print('all vol after', volatility.describe())
     
         # Return the average volatility over the window
         return volatility.mean(axis=0)  # Use axis=0 to average volatilities across columns if needed

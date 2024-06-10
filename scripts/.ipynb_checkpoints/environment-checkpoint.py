@@ -218,9 +218,12 @@ class SimulationEnvironment:
         print('Current Financials:')
         cumulative_return = calc_cumulative_return(current_daily_returns)
         self.action_log.append({'date': self.current_date, 'current cumulative return': cumulative_return.iloc[-1]})
+        print('rl target weights for distance penalty', target_weights)
+        print('current weights for distance penalty', current_weights)
 
         max_distance = sum(abs(1 - value) for value in target_weights.values())
         distance_penalty = sum(abs(current_weights.get(key, 0) - value) for key, value in target_weights.items()) / max_distance if max_distance != 0 else 0
+        print('distance penalty target - current', current_weights)
         self.action_log.append({'date': self.current_date, 'Distance penalty': distance_penalty})
 
         sortino_scale = 100000
@@ -252,7 +255,7 @@ class SimulationEnvironment:
 
         self.dai_ceiling = self.simulator.data[dai_ceilings]
         self.action_log.append({'date': self.current_date, 'dai ceilings': self.dai_ceiling})
-        print('reward', reward)
+        print('reward no scale', reward_no_scale)
         
         return reward_no_scale, current_weights
 

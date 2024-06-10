@@ -1,0 +1,2 @@
+best_params,best_score,best_alpha,beginning_timestamp,finish_timestamp
+"{'scale_factor': 453000000, 'minimum_value_factor': 0.008, 'volatility_window': 250, 'lp_volatility_scale': 0.5}",2.8980569488771514e+17,{'estimator__alpha': 100},2024-06-09 17:34:03,2024-06-09 18:52:43

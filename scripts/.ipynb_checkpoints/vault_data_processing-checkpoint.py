@@ -6,7 +6,7 @@ import random
 import time
 from datetime import timedelta
 
-test_data = pd.read_csv('data/csv/test_data.csv')
+test_data = pd.read_csv('data/csv/filtered_test_data.csv')
 
 test_data.set_index('day', inplace=True)
 

@@ -33,6 +33,8 @@ from scripts.simulation import RL_VaultSimulator
 from scripts.environment import SimulationEnvironment
 from scripts.vault_data_processing import test_data, targets, features, temporals, dai_ceilings, vault_names, key_mapping
 from scripts.vault_utils import mvo, historical_sortino, visualize_mvo_results, evaluate_predictions, generate_action_space, calc_cumulative_return, evaluate_multi_predictions, abbreviate_number
+from scripts.mvo_environment import SimulationEnvironment as mvo_sim_environment
+
 import random
 import torch
 
@@ -61,6 +63,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 #st.write(treasury_historical_portfolio_returns)
 
 
+#st.write(test_data[['LP Vault_market_price','Altcoin Vault_market_price','Stablecoin Vault_market_price']])
 
 
 def treasury_advisor(rebalance_frequency, selected_assets, eth_bound, start_date, end_date):
@@ -142,11 +145,11 @@ def vault_advisor(start_date, end_date, bounds):
         'stETH Vault_dai_ceiling': [-0.5, 0.5],
         'ETH Vault_dai_ceiling': [-0.5, 0.5],
         'BTC Vault_dai_ceiling': [-0.5, 0.5],
-        'Altcoin Vault_dai_ceiling': [-0.25, 0.25],
-        'Stablecoin Vault_dai_ceiling': [-0.25, 0.25],
-        'LP Vault_dai_ceiling': [0, 0],
+        'Altcoin Vault_dai_ceiling': [-0.15,0.15],
+        'Stablecoin Vault_dai_ceiling': [-0.15, 0.15],
+        'LP Vault_dai_ceiling': [-0.15,0.15],
         'RWA Vault_dai_ceiling': [0, 0],
-        'PSM Vault_dai_ceiling': [-0.5, 0.5]
+        'PSM Vault_dai_ceiling': [-1, 0.5]
     }
     action_space = generate_action_space(vault_action_ranges)
     
@@ -157,7 +160,7 @@ def vault_advisor(start_date, end_date, bounds):
     st.sidebar.write("Starting RL agent training...")
     rfl_agent = RlAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period=1)
     initial_action_rl = rfl_agent.initial_strategy(initial_weights)
-    rl_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=300000000, minimum_value_factor=0.05, volatility_window=250)
+    rl_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     rl_simulator.train_model()
     rl_environment = SimulationEnvironment(rl_simulator, start_date, end_date, rfl_agent,bounds)
     rl_environment.reset()
@@ -172,9 +175,9 @@ def vault_advisor(start_date, end_date, bounds):
     st.sidebar.write("Starting MVO agent training...")
     mevo_agent = MVOAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period=1)
     initial_action_mvo = mevo_agent.initial_strategy(initial_weights)
-    mvo_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=300000000, minimum_value_factor=0.05, volatility_window=250)
+    mvo_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     mvo_simulator.train_model()
-    mvo_environment = SimulationEnvironment(mvo_simulator, start_date, end_date, mevo_agent,bounds)
+    mvo_environment = mvo_sim_environment(mvo_simulator, start_date, end_date, mevo_agent,bounds)
     mvo_environment.reset()
     state, reward, done, info = mvo_environment.run()
     mvo_action_df = mvo_environment.generate_action_dataframe()
@@ -198,14 +201,7 @@ def validate_date_range(start_date, end_date):
         return False
     return True
 
-def get_user_bounds(vaults):
-        bounds = []
-        for vault in vaults:
-            st.write(f"Set bounds for {vault}:")
-            lower_bound = st.number_input(f"Lower bound for {vault} (%)", min_value=0.0, max_value=1.0, value=0.05, step=0.01)
-            upper_bound = st.number_input(f"Upper bound for {vault} (%)", min_value=0.0, max_value=1.0, value=0.3, step=0.01)
-            bounds.append((lower_bound, upper_bound))
-        return bounds
+
 
 vaults = ['BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_collateral_usd', 
           'Stablecoin Vault_collateral_usd', 'Altcoin Vault_collateral_usd', 'LP Vault_collateral_usd', 
@@ -312,18 +308,30 @@ else:
     eth_bound = 0
     vault_starting_date = st.sidebar.date_input('Start Date', value=vault_min_start_date, min_value=vault_min_start_date, max_value = vault_min_end_date- timedelta(days=7))
     vault_ending_date = st.sidebar.date_input('End Date', value=vault_min_end_date, min_value=vault_min_start_date + timedelta(days=7), max_value=vault_min_end_date)
-    def get_user_bounds(vaults):
+    def get_user_bounds():
         bounds = {}
-        for vault in vaults:
-            lower_bound = st.sidebar.number_input(f"Lower bound for {vault} ", min_value=0.05, max_value=0.3, value=0.05, step=0.01)
-            upper_bound = st.sidebar.number_input(f"Upper bound for {vault} ", min_value=0.2, max_value=1.0, value=0.2, step=0.01)
-            bounds[vault] = (lower_bound, upper_bound)
+        bounds['BTC Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for BTC Vault", min_value=0.05, max_value=0.3, value=0.3, step=0.01),
+                                              st.sidebar.number_input("Upper bound for BTC Vault", min_value=0.2, max_value=0.5, value=0.3, step=0.01))
+        bounds['ETH Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for ETH Vault", min_value=0.1, max_value=0.5, value=0.1, step=0.01),
+                                              st.sidebar.number_input("Upper bound for ETH Vault", min_value=0.3, max_value=0.5, value=0.5, step=0.01))
+        bounds['stETH Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for stETH Vault", min_value=0.05, max_value=0.3, value=0.1, step=0.01),
+                                                st.sidebar.number_input("Upper bound for stETH Vault", min_value=0.1, max_value=0.5, value=0.3, step=0.01))
+        bounds['Stablecoin Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for Stablecoin Vault", min_value=0.0, max_value=0.1, value=0.05, step=0.01),
+                                                     st.sidebar.number_input("Upper bound for Stablecoin Vault", min_value=0.05, max_value=0.15, value=0.1, step=0.01))
+        bounds['Altcoin Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for Altcoin Vault", min_value=0.0, max_value=0.1, value=0.05, step=0.01),
+                                                  st.sidebar.number_input("Upper bound for Altcoin Vault", min_value=0.05, max_value=0.2, value=0.1, step=0.01))
+        bounds['LP Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for LP Vault", min_value=0.00, max_value=0.1, value=0.05, step=0.01),
+                                             st.sidebar.number_input("Upper bound for LP Vault", min_value=0.05, max_value=0.1, value=0.1, step=0.01))
+        bounds['RWA Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for RWA Vault", min_value=0.05, max_value=0.05, value=0.05, step=0.01),
+                                              st.sidebar.number_input("Upper bound for RWA Vault", min_value=0.05, max_value=0.05, value=0.05, step=0.01))
+        bounds['PSM Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for PSM Vault", min_value=0.05, max_value=0.3, value=0.05, step=0.01),
+                                              st.sidebar.number_input("Upper bound for PSM Vault", min_value=0.1, max_value=0.5, value=0.2, step=0.01))
         return bounds
 
     vaults = ['BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_collateral_usd', 
-              'Stablecoin Vault_collateral_usd', 'Altcoin Vault_collateral_usd', 'LP Vault_collateral_usd', 
+              'Stablecoin Vault_collateral_usd', 'Altcoin Vault_collateral_usd', 
               'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd']
-    bounds = get_user_bounds(vaults)
+    bounds = get_user_bounds()
     st.session_state['vault_bounds'] = bounds
     
     
@@ -469,10 +477,13 @@ with tabs[1]:
 
 
             mvo_sortino_timeseries = mvo_action_df['current sortino ratio'].dropna()
+            mvo_comp = mvo_action_df['current composition'].dropna()
+            mvo_targets = mvo_action_df['target weights'].dropna()
             
             
             #st.sidebar.write("Vault Advisor simulation completed. Check the respective Vault advisor tab for results.")
-
+            #st.write('mvo comps', mvo_comp)
+            #st.write('mvo targets', mvo_targets)
         st.divider()
         historical_total_portfolio_value, historical_portfolio_daily_returns, historical_returns, historical_sortino_ratio, historical_portfolio_composition, hist_comparison = st.session_state['vault_historical']
         #st.dataframe(mvo_sim_portfolio_daily_returns)
@@ -657,7 +668,7 @@ with tabs[1]:
             y=rl_sortino_timeseries.values,
             mode='lines',
             name='RL Robo Advisor Sortino Ratios',
-            line=dict(color='red')
+            line=dict(color='Blue')
         )
         
         # Create the layout

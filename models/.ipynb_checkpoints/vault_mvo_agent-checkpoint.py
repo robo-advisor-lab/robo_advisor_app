@@ -104,6 +104,7 @@ class MVOAgent:
         print("Calculating dynamic strategy based on optimized weights...")
         for vault, current_weight in current_weights.items():
             target_weight = self.target_weights.get(vault, 0)
+            print('target weight', target_weight)
             adjustment = self.calculate_adjustment(current_weight, target_weight, vault)
             
             adjusted_vault_name = vault.replace('_collateral_usd', '_dai_ceiling')
@@ -115,22 +116,25 @@ class MVOAgent:
             
         return action_dict
 
-    def agent_policy(self, state, dai_ceilings):
+
+    def agent_policy(self, state, dai_ceilings, target_weights=None):
         self.current_cycle += 1
         self.dai_ceilings = dai_ceilings
         state_key = self.get_state_representation(state)
         print(f"Cycle Number: {self.current_cycle}, Epsilon: {self.epsilon}")
 
+        # Update target_weights if provided
+        if target_weights:
+            self.target_weights = target_weights
+            print(f"Updated target weights: {self.target_weights}")
+
         # Determine action based on the phase of the strategy
         if self.current_cycle <= self.initial_strategy_period:
             action = self.initial_strategy(state)
-            reason = 'initial strategy'
-        elif np.random.rand() < self.epsilon:
-            action = self.random_action(state)
-            reason = 'exploration (random selection for wider state exploration)'
+            reason = 'mvo initial strategy'
         else:
             action = self.calculate_dynamic_strategy(state)
-            reason = 'exploitation (based on learned values aiming for optimal performance)'
+            reason = 'mvo exploitation (based on learned values aiming for optimal performance)'
 
         if self.current_cycle > self.initial_strategy_period:
             self.epsilon *= (self.epsilon_decay ** 2)  # Example of more aggressive decay
