@@ -66,7 +66,9 @@ def apply_scalar_formatter(ax):
 #from vault_data_processing import test_data, targets, features, temporals, dai_ceilings, vault_names, key_mapping
 from vault_utils import mvo, historical_sortino, visualize_mvo_results, evaluate_predictions, generate_action_space, calc_cumulative_return, evaluate_multi_predictions, abbreviate_number
 
-test_data = pd.read_csv('test_data.csv')
+#test_data = pd.read_csv('data/csv/filtered_test_data.csv')
+
+test_data = pd.read_csv('data/csv/test_data.csv')
 # Convert index to datetime and ensure no timezone information
 
 
@@ -623,7 +625,7 @@ results = {
 results_df = pd.DataFrame([results])
 
 # Save to CSV
-results_df.to_csv('grid_search_results.csv', index=False)
+results_df.to_csv('data/csv/filtered_test_data.csv', index=False)
 
 
 print("Best parameters found: ", best_params), print("Best score: ", best_score), print("Best gridsearch params", best_alpha)
