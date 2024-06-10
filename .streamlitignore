@@ -1,0 +1,12 @@
+# Ignore Jupyter notebooks
+*.ipynb
+
+# Ignore Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore Jupyter configuration files
+.jupyter/
+
+# Ignore directories commonly used for Jupyter notebooks
+notebooks/
+
