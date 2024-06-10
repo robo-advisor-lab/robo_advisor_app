@@ -145,9 +145,9 @@ def vault_advisor(start_date, end_date, bounds):
         'stETH Vault_dai_ceiling': [-0.5, 0.5],
         'ETH Vault_dai_ceiling': [-0.5, 0.5],
         'BTC Vault_dai_ceiling': [-0.5, 0.5],
-        'Altcoin Vault_dai_ceiling': [-0.15,0.15],
-        'Stablecoin Vault_dai_ceiling': [-0.15, 0.15],
-        'LP Vault_dai_ceiling': [-0.15,0.15],
+        'Altcoin Vault_dai_ceiling': [-0.1,0.1],
+        'Stablecoin Vault_dai_ceiling': [-0.1, 0.1],
+        'LP Vault_dai_ceiling': [-0.1,0.1],
         'RWA Vault_dai_ceiling': [0, 0],
         'PSM Vault_dai_ceiling': [-1, 0.5]
     }
