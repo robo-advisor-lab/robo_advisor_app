@@ -19,12 +19,13 @@ import random
 import cvxpy as cp
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import plotly.express as px
 
 # Treasury Advisor
 from models.treasury_mvo_model import mvo_model
 from models.treasury_rl_model import PortfolioEnv, train_rl_agent
 from scripts.treasury_utils import calculate_sortino_ratio, calculate_treynor_ratio, calculate_cagr, calculate_beta, normalize, calculate_log_returns
-from scripts.treasury_data_processing import mvo_combined_assets, combined_all_assets, panama_dao_start_date, current_risk_free, historical_normalized_returns, historical_cumulative_return, historical_returns as treasury_historical_portfolio_returns, pivot_data_filtered, pivot_assets, index_start, indicies, tbill, combined_assets, panamadao_returns, calculate_historical_returns
+from scripts.treasury_data_processing import mvo_combined_assets, combined_all_assets, panama_dao_start_date, current_risk_free, historical_normalized_returns, historical_cumulative_return, historical_returns as treasury_historical_portfolio_returns, pivot_data_filtered, pivot_assets, index_start, indicies, tbill, combined_assets, panamadao_returns, calculate_historical_returns, iniital_composition as panama_dao_initial_comp
 
 # Vault Advisor
 from models.vault_mvo_agent import MVOAgent
@@ -66,28 +67,27 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 #st.write(test_data[['LP Vault_market_price','Altcoin Vault_market_price','Stablecoin Vault_market_price']])
 
 
-def treasury_advisor(rebalance_frequency, selected_assets, eth_bound, start_date, end_date):
+def treasury_advisor(rebalance_frequency, selected_assets, eth_bound, start_date, end_date, random_seed):
+    set_random_seed(random_seed)
     st.sidebar.write("Starting RL agent training...")
     filtered_assets = selected_assets
     rl_rebalancing_frequency = rebalance_frequency
     treasury_start_date = start_date 
     treasury_end_date = end_date 
 
-    if not validate_date_range(treasury_starting_date, treasury_ending_date):
+    if not validate_date_range(treasury_start_date, treasury_end_date):
         st.stop()
     
-
     filtered_data_treasury = combined_all_assets[combined_all_assets.index  <= treasury_end_date]
     # RL Model
-    actions_df, rl_portfolio_returns, rl_cumulative_return, rl_normalized_returns, composition_df, returns_df = train_rl_agent(combined_all_assets, filtered_assets, eth_bound, current_risk_free, rl_rebalancing_frequency, treasury_start_date, treasury_end_date)
+    actions_df, rl_portfolio_returns, rl_cumulative_return, rl_normalized_returns, composition_df, returns_df = train_rl_agent(combined_all_assets, filtered_assets, eth_bound, current_risk_free, rl_rebalancing_frequency, treasury_start_date, treasury_end_date, random_seed)
     st.sidebar.write("RL agent training completed.")
     st.session_state['treasury_rl'] = (actions_df, rl_portfolio_returns, rl_cumulative_return, rl_normalized_returns, composition_df, returns_df)
-    #st.session_state['treasury_historical_returns'] = filtered_historical_portfolio_returns
 
     # MVO Model
     mvo_rebalancing_frequency = rebalance_frequency
     threshold = 0
-    model = mvo_model(eth_bound, current_risk_free, treasury_start_date, treasury_end_date)
+    model = mvo_model(eth_bound, current_risk_free, treasury_start_date, treasury_end_date, random_seed)
     st.sidebar.write(f"Rebalancing MVO model starting {treasury_start_date}...")
     rebalanced_data = model.rebalance(filtered_data_treasury, filtered_assets, mvo_rebalancing_frequency)
     st.sidebar.write("MVO model rebalancing completed.")
@@ -102,16 +102,25 @@ def treasury_advisor(rebalance_frequency, selected_assets, eth_bound, start_date
     mvo_normalized_returns.set_index('DAY', inplace=True)
     st.session_state['treasury_mvo'] = (rebalanced_data, mvo_daily_portfolio_returns, mvo_cumulative_return, mvo_normalized_returns)
 
+
 ## Vault Model Historical
 simulation_data = test_data
 simulation_data.index = pd.to_datetime(simulation_data.index)
 simulation_data.index = simulation_data.index.tz_localize(None)
-vault_historical = test_data[targets]
+vault_historical = simulation_data[targets]
 start_date = '2022-05-20'
 end_date = '2024-03-20'
+start_date_dtst = datetime.strptime(start_date, '%Y-%m-%d')
+end_date_dt = datetime.strptime(end_date, '%Y-%m-%d')
+
+# Calculate the difference in days
+vault_sim_total_days = (end_date_dt - start_date_dtst).days
+
 start_date_dt = pd.to_datetime(start_date)
 historical_cutoff = start_date_dt - pd.DateOffset(days=1)
 vault_historical_data = vault_historical[vault_historical.index <= historical_cutoff]
+vault_historical_data_1 = vault_historical[vault_historical.index <= historical_cutoff + pd.DateOffset(days=1)]
+vault_historical_data_1 = vault_historical_data_1.merge(test_data['RWA Vault_collateral_usd'], left_index=True, right_index=True, how='left')
 test_data.index = pd.to_datetime(test_data.index).tz_localize(None)
 vault_historical_data = vault_historical_data.merge(test_data['RWA Vault_collateral_usd'], left_index=True, right_index=True, how='left')
 
@@ -120,6 +129,12 @@ ceiling_historical_cutoff = historical_cutoff.tz_localize(None)
 historical_ceilings_for_sim =  historical_ceilings[historical_ceilings.index <= ceiling_historical_cutoff]
 historical_sim = test_data[test_data.index <= end_date]
 historical_sim = historical_sim[targets].merge(test_data['RWA Vault_collateral_usd'], left_index=True, right_index=True, how='left')
+
+
+    
+        
+
+
 #historical_portfolio_daily_returns,  historical_downside_returns, historical_excess_returns, historical_sortino_ratio = #historical_sortino(historical_portfolio_returns,historical_portfolio_composition)
 #historical_returns = calc_cumulative_return(historical_portfolio_daily_returns)
 
@@ -127,7 +142,8 @@ historical_sim = historical_sim[targets].merge(test_data['RWA Vault_collateral_u
 #st.write(hist_comparison[targets].index.min(), hist_comparison[targets].index.max())
 
 
-def vault_advisor(start_date, end_date, bounds):
+def vault_advisor(start_date, end_date, bounds, seed, reward_type, initial_strategy_period=1):
+    set_random_seed(random_seed)
     if not validate_date_range(start_date, end_date):
         st.stop()
     
@@ -141,15 +157,16 @@ def vault_advisor(start_date, end_date, bounds):
         
     initial_weights = dict(portfolio_composition.loc[start_date].to_dict())
     optimized_weight_dict = dict(zip(vault_names, portfolio_mvo_weights))
+    #st.sidebar.write('Initial Strategy:', optimized_weight_dict)
     vault_action_ranges = {
-        'stETH Vault_dai_ceiling': [-0.5, 0.5],
+        'stETH Vault_dai_ceiling': [-0.4, 0.4],
         'ETH Vault_dai_ceiling': [-0.5, 0.5],
         'BTC Vault_dai_ceiling': [-0.5, 0.5],
         'Altcoin Vault_dai_ceiling': [-0.1,0.1],
         'Stablecoin Vault_dai_ceiling': [-0.1, 0.1],
-        'LP Vault_dai_ceiling': [-0.1,0.1],
+        'LP Vault_dai_ceiling': [-0.15,0.15],
         'RWA Vault_dai_ceiling': [0, 0],
-        'PSM Vault_dai_ceiling': [-1, 0.5]
+        'PSM Vault_dai_ceiling': [-0.5, 0.5]
     }
     action_space = generate_action_space(vault_action_ranges)
     
@@ -158,7 +175,7 @@ def vault_advisor(start_date, end_date, bounds):
 
     # RL Model
     st.sidebar.write("Starting RL agent training...")
-    rfl_agent = RlAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period=1)
+    rfl_agent = RlAgent(action_space, optimized_weight_dict, vault_action_ranges, reward_type, initial_strategy_period)
     initial_action_rl = rfl_agent.initial_strategy(initial_weights)
     rl_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     rl_simulator.train_model()
@@ -173,7 +190,7 @@ def vault_advisor(start_date, end_date, bounds):
 
     # MVO Model
     st.sidebar.write("Starting MVO agent training...")
-    mevo_agent = MVOAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period=1)
+    mevo_agent = MVOAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period)
     initial_action_mvo = mevo_agent.initial_strategy(initial_weights)
     mvo_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     mvo_simulator.train_model()
@@ -208,37 +225,39 @@ vaults = ['BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_c
           'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd']
 
 # Simulation function
-def run_simulation(agent_class, eth_bound=None, rebalance_frequency=None, start_date=None, end_date=None, user_bounds=None):
+def run_simulation(agent_class, eth_bound=None, rebalance_frequency=None, start_date=None, end_date=None, user_bounds=None, initial_strategy_period=None, reward_type=None):
     set_random_seed(random_seed)
     if agent_class == "Treasury":
         st.sidebar.write("Running Treasury Advisor...")
-
         if not validate_dates(treasury_starting_date, treasury_ending_date, rebalance_frequency):
             return
-        treasury_advisor(rebalance_frequency,selected_assets, eth_bound, treasury_starting_date, treasury_ending_date)
+        treasury_advisor(rebalance_frequency, selected_assets, eth_bound, treasury_starting_date, treasury_ending_date, random_seed)
         st.session_state['rebalance_frequency'] = rebalance_frequency
         filtered_historical_portfolio_returns = treasury_historical_portfolio_returns[(treasury_historical_portfolio_returns.index >= treasury_starting_date) & (treasury_historical_portfolio_returns.index <= treasury_ending_date)]
-        #historical_treasury_sortino = calculate_sortino_ratio(filtered_historical_portfolio_returns['weighted_daily_return'].values, current_risk_free)
         st.session_state['treasury_historical_returns'] = filtered_historical_portfolio_returns
-        #st.write(filtered_historical_portfolio_returns)
         st.session_state['initial_amount'] = initial_amount
         st.session_state['treasury_start_date'] = treasury_starting_date
         st.session_state['selected_assets'] = selected_assets
         st.session_state['eth_bound'] = eth_bound
     elif agent_class == "Vault":
         st.sidebar.write("Running Vault Advisor...")
-        #st.sidebar.write(st.session_state['vault_bounds'])
         st.session_state['run_vault_bounds'] = st.session_state['vault_bounds']
-        vault_advisor(vault_starting_date, vault_ending_date, st.session_state['vault_bounds'])
+        #st.sidebar.write('initial_strategy_period', initial_strategy_period)
+        st.session_state['initial_strategy_period'] = initial_strategy_period
+        
+        st.session_state['run_initial_strategy'] = st.session_state['initial_strategy']
+        vault_advisor(vault_starting_date, vault_ending_date, st.session_state['vault_bounds'], random_seed, reward_type, initial_strategy_period)
         pandas_vault_starting_date = pd.to_datetime(vault_starting_date)
         pandas_vault_ending_date = pd.to_datetime(vault_ending_date)
         filtered_historical_sim = historical_sim[historical_sim.index <= pandas_vault_ending_date]
         historical_optimized_weights, historical_portfolio_returns, historical_portfolio_composition, historical_total_portfolio_value = mvo(filtered_historical_sim, st.session_state['vault_bounds'])
-        #vault_filtered_historical_portfolio_returns= historical_portfolio_returns[(historical_portfolio_returns.index >= vault_starting_date) & (historical_portfolio_returns.index <= vault_ending_date)]
-        historical_portfolio_daily_returns,  historical_downside_returns, historical_excess_returns, historical_sortino_ratio = historical_sortino(historical_portfolio_returns,historical_portfolio_composition)
+        historical_portfolio_daily_returns, historical_downside_returns, historical_excess_returns, historical_sortino_ratio = historical_sortino(historical_portfolio_returns,historical_portfolio_composition)
         historical_returns = calc_cumulative_return(historical_portfolio_daily_returns)
         hist_comparison = test_data[(test_data.index >= pandas_vault_starting_date) & (test_data.index <= pandas_vault_ending_date)]
         st.session_state['vault_historical'] = (historical_total_portfolio_value, historical_portfolio_daily_returns, historical_returns, historical_sortino_ratio, historical_portfolio_composition, hist_comparison)
+        st.session_state['vault_starting_date'] = pandas_vault_starting_date
+        st.session_state['reward_type'] = reward_type
+
         
         
 
@@ -267,7 +286,7 @@ vault_min_end_date = simulation_data.index.max().date()
 
 # Add rebalance frequency input only for Treasury Advisor
 if agent_class == "Treasury":
-    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=7)
+    rebalance_frequency = st.sidebar.number_input('Rebalance Frequency (days)', min_value=1, max_value=30, value=15)
     initial_amount = st.sidebar.number_input('Initial Amount (USD)', value=100)
     selected_assets = st.sidebar.multiselect(
         'Select assets to include in the Treasury Advisor:',
@@ -290,6 +309,7 @@ if agent_class == "Treasury":
     treasury_ending_date = datetime.combine(treasury_ending_date, datetime.min.time())
     treasury_ending_date = treasury_ending_date + timedelta(days=1)
     bounds = st.session_state['vault_bounds']
+    #initial_strategy_period = st.session_state['initial_strategy_period']
 
     #st.write(treasury_starting_date)
     
@@ -306,7 +326,7 @@ else:
     initial_amount = 100
     selected_assets = mvo_combined_assets if 'treasury_rl' not in st.session_state or 'treasury_mvo' not in st.session_state else st.session_state['selected_assets']
     eth_bound = 0
-    vault_starting_date = st.sidebar.date_input('Start Date', value=vault_min_start_date, min_value=vault_min_start_date, max_value = vault_min_end_date- timedelta(days=7))
+    vault_starting_date = st.sidebar.date_input('Start Date', value=vault_min_start_date, min_value=vault_min_start_date, max_value = vault_min_start_date)
     vault_ending_date = st.sidebar.date_input('End Date', value=vault_min_end_date, min_value=vault_min_start_date + timedelta(days=7), max_value=vault_min_end_date)
     def get_user_bounds():
         bounds = {}
@@ -320,7 +340,7 @@ else:
                                                      st.sidebar.number_input("Upper bound for Stablecoin Vault", min_value=0.05, max_value=0.15, value=0.1, step=0.01))
         bounds['Altcoin Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for Altcoin Vault", min_value=0.0, max_value=0.1, value=0.05, step=0.01),
                                                   st.sidebar.number_input("Upper bound for Altcoin Vault", min_value=0.05, max_value=0.2, value=0.1, step=0.01))
-        bounds['LP Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for LP Vault", min_value=0.00, max_value=0.1, value=0.05, step=0.01),
+        bounds['LP Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for LP Vault", min_value=0.05, max_value=0.1, value=0.05, step=0.01),
                                              st.sidebar.number_input("Upper bound for LP Vault", min_value=0.05, max_value=0.1, value=0.1, step=0.01))
         bounds['RWA Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for RWA Vault", min_value=0.05, max_value=0.05, value=0.05, step=0.01),
                                               st.sidebar.number_input("Upper bound for RWA Vault", min_value=0.05, max_value=0.05, value=0.05, step=0.01))
@@ -331,14 +351,21 @@ else:
     vaults = ['BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_collateral_usd', 
               'Stablecoin Vault_collateral_usd', 'Altcoin Vault_collateral_usd', 
               'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd']
+    vault_total_cycles = vault_sim_total_days / 24
+    initial_strategy_period = st.sidebar.number_input('Initial Strategy Period', min_value=0, max_value=10, value=1)
+    reward_type = st.sidebar.radio('Reward Type', ['Balanced', 'Aggressive'], index=0)
     bounds = get_user_bounds()
+    #st.sidebar.write('total days', vault_sim_total_days)
+    
+    #st.sidebar.write('max 24 day cycles', int(vault_total_cycles))
     st.session_state['vault_bounds'] = bounds
+    
     
     
     
     #st.session_state['eth_bound'] = eth_bound
     #st.session_state['selected_assets'] = selected_assets
-    #st.session_state['vault_starting_date'] = vault_starting_date
+    #
 
 
     
@@ -348,9 +375,10 @@ tabs = st.tabs(["Home","Vault Robo Advisor", "Treasury Robo Advisor"])
 
 if run_simulation_button:
     st.sidebar.write("Running the simulation, please wait...")
-    
-    run_simulation(agent_class, eth_bound, rebalance_frequency, st.session_state['vault_bounds'])
+    #st.sidebar.write('initial_strategy_period', initial_strategy_period)
+    run_simulation(agent_class, eth_bound, rebalance_frequency, st.session_state['vault_bounds'], random_seed, reward_type=reward_type, initial_strategy_period = 1 if 'initial_strategy_period' not in st.session_state else initial_strategy_period)
     st.sidebar.write("Simulation completed.")
+
     
 with tabs[0]:
     st.title("Robo Advisor App")
@@ -400,10 +428,40 @@ with tabs[0]:
 with tabs[1]:
     st.header("Vault Robo Advisor")
     st.markdown("**Backtesting to MakerDAO Historical Data**")
+    pandas_vault_starting_date = st.session_state['vault_starting_date'] if 'vault_starting_date' in st.session_state else start_date_dtst
+    #st.write(pd.to_datetime(vault_starting_date))
+    historical_mvo_weights, _, historical_portfolio_composition,_ = mvo(simulation_data[simulation_data.index <= pd.to_datetime(pandas_vault_starting_date)], st.session_state['vault_bounds'])
+    historical_initial_weights = dict(historical_portfolio_composition.loc[pd.to_datetime(pandas_vault_starting_date)].to_dict())
+    historical_optimized_weight_dict = dict(zip(vault_names, historical_mvo_weights))
+    
+    st.session_state['initial_strategy'] = historical_optimized_weight_dict
+    
+    # Create subplots
+    fig_strat = make_subplots(rows=1, cols=2, specs=[[{'type':'domain'}, {'type':'domain'}]],
+                        subplot_titles=['Initial Composition', 'Initial Strategy'])
+    
+    # Add initial composition pie chart
+    fig_strat.add_trace(go.Pie(labels=list(historical_initial_weights.keys()), values=list(historical_initial_weights.values()), name="Initial Composition"),
+                  row=1, col=1)
+    
+    # Add initial strategy pie chart
+    fig_strat.add_trace(go.Pie(labels=list(historical_optimized_weight_dict.keys()), values=list(historical_optimized_weight_dict.values()), name="Initial Strategy"),
+                  row=1, col=2)
+    
+    # Update layout
+    fig_strat.update_layout(title_text=f'Initial Composition and Initial Strategy as of {simulation_data[simulation_data.index <= pd.to_datetime(pandas_vault_starting_date)].index.max()}')
+    
+    # Display the pie charts
+    st.plotly_chart(fig_strat)
+
+    #st.write()
     
     if 'vault_rl' in st.session_state or 'vault_mvo' in st.session_state:
         st.write('Chosen Vault Bounds:')
         st.write(st.session_state['run_vault_bounds'] if 'run_vault_bounds' in st.session_state else st.session_state['vault_bounds'])
+        st.write(f"Initial Strategy Period: {st.session_state['initial_strategy_period']} cycles")
+        st.write('Initial Strategy', st.session_state['run_initial_strategy'])
+        st.write('Reward Type:', st.session_state['reward_type'])
         if 'vault_rl' in st.session_state:
             rl_sim_results, rl_action_df, rl_vaults = st.session_state['vault_rl']
             st.write(f"Simulation from {rl_sim_results.index.min()} through {rl_sim_results.index.max()}")
@@ -447,6 +505,12 @@ with tabs[1]:
 
 
             rl_sortino_timeseries = rl_action_df['current sortino ratio'].dropna()
+            reward_balanced = rl_action_df['Reward no scale'].dropna()
+            reward_aggressive = rl_action_df['sortino reward'].dropna()
+            reward_types_list = rl_action_df['reward type'].dropna()
+            #st.write('balanced rewards', reward_balanced)
+            #st.write('aggressive rewards',reward_aggressive)
+            #st.write('reward type', reward_types_list)
             
             
         if 'vault_mvo' in st.session_state:
@@ -486,6 +550,9 @@ with tabs[1]:
             #st.write('mvo targets', mvo_targets)
         st.divider()
         historical_total_portfolio_value, historical_portfolio_daily_returns, historical_returns, historical_sortino_ratio, historical_portfolio_composition, hist_comparison = st.session_state['vault_historical']
+        #st.write('rl cum return', rl_optimized_returns)
+        #st.write('mvo cum return',mvo_optimized_returns )
+        #st.write('historical cum return', historical_returns)
         #st.dataframe(mvo_sim_portfolio_daily_returns)
         #st.dataframe(rl_sim_portfolio_daily_returns)
         #st.dataframe(historical_portfolio_daily_returns)
@@ -493,10 +560,12 @@ with tabs[1]:
         vcol1, vcol2, vcol3 = st.columns(3)
         with vcol1:
             st.metric(label="RL current portfolio value", value=f"${abbreviate_number(rl_total_portfolio_value.iloc[-1])}")
+            st.metric(label="RL Cumualtive Return", value=f"{rl_optimized_returns.iloc[-1]*100:.2f}%")
             st.metric(label="RL sortino ratio", value=f"{rl_sim_sortino_ratio:.2f}")
         
         with vcol2:
             st.metric(label="MVO current portfolio value", value=f"${abbreviate_number(mvo_total_portfolio_value.iloc[-1])}")
+            st.metric(label="MVO Cumulative Return", value=f"{mvo_optimized_returns.iloc[-1]*100:.2f}%")
             st.metric(label="MVO sortino ratio", value=f"{mvo_sim_sortino_ratio:.2f}")
 
          
@@ -504,6 +573,7 @@ with tabs[1]:
         
         with vcol3:
             st.metric(label="Historical current portfolio value", value=f"${abbreviate_number(historical_total_portfolio_value.iloc[-1])}")
+            st.metric(label="Historical Cumulative Return", value=f"{historical_returns.iloc[-1]*100:.2f}%")
             st.metric(label="Historical sortino ratio", value=f"{historical_sortino_ratio:.2f}")
         vault_names = ['ETH Vault', 'stETH Vault', 'BTC Vault', 'Altcoin Vault', 'Stablecoin Vault', 'LP Vault', 'PSM Vault']
         st.subheader('Reinforcement Learning Results')
@@ -545,7 +615,11 @@ with tabs[1]:
             st.write(metrics)
         st.line_chart(hist_comparison[targets])
 
-        
+        mvo_optimized_returns = mvo_optimized_returns[mvo_optimized_returns.index >= pandas_vault_starting_date]
+        historical_returns = historical_returns[historical_returns.index >= pandas_vault_starting_date]
+        rl_optimized_returns = rl_optimized_returns[rl_optimized_returns.index >= pandas_vault_starting_date]
+        #st.write(len(historical_returns.index))
+        #st.write('mvo returns', len(mvo_optimized_returns[mvo_optimized_returns.index >= pandas_vault_starting_date]))
 
         trace1 = go.Scatter(
             x=rl_optimized_returns.index,
@@ -584,6 +658,10 @@ with tabs[1]:
         
         # Render the figure in Streamlit
         st.plotly_chart(fig)
+
+        mvo_total_portfolio_value = mvo_total_portfolio_value[mvo_total_portfolio_value.index >= pandas_vault_starting_date]
+        historical_total_portfolio_value = historical_total_portfolio_value[historical_total_portfolio_value.index >= pandas_vault_starting_date]
+        rl_total_portfolio_value = rl_total_portfolio_value[rl_total_portfolio_value.index >= pandas_vault_starting_date]
         
         trace1 = go.Scatter(
             x=rl_total_portfolio_value.index,
@@ -685,14 +763,13 @@ with tabs[1]:
         # Render the figure
         st.plotly_chart(fig)
         
-
+    
 
 
 with tabs[2]:
     st.header("Treasury Robo Advisor")
     st.markdown("**Backtesting to PanamaDAO Historical Data**")
-    #st.write('Selected Assets:', selected_assets)
-    #st.write('ETH Bound', eth_bound)
+    
     if 'treasury_rl' in st.session_state or 'treasury_mvo' in st.session_state:
         selected_assets = st.session_state['selected_assets'] 
         
@@ -721,7 +798,7 @@ with tabs[2]:
             st.write(f"Simulation from {rl_portfolio_returns.index.min()} through {rl_portfolio_returns.index.max()}")
             tresaury_sim_days = rl_portfolio_returns.index.max() - rl_portfolio_returns.index.min()
             st.write(f'Total Duration: {tresaury_sim_days}')
-            #st.write('rl_port returns')
+            #st.write('composition df', composition_df)
             #st.write(rl_portfolio_returns['Portfolio Return'])
             
             rl_sortino = calculate_sortino_ratio(rl_portfolio_returns['Portfolio Return'].values, current_risk_free)

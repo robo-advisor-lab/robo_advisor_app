@@ -39,27 +39,23 @@ class mvo_model():
     
         return sortino_ratio
     
-    def mvo_sortino(self, returns, sortino_ratios, eth_index):
+    def mvo_sortino(self, returns, sortino_ratios, eth_index, seed):
         n = returns.shape[1]
-        print('n for weights', n)
+        random.seed(seed)
+        np.random.seed(seed)
+        print('seed', seed)
         
-        # Validate the shape and content of returns and sortino_ratios
-        print(f'Returns shape: {returns.shape}')
-        print(f'Returns head:\n{returns[:5]}')
-        print(f'Sortino ratios shape: {sortino_ratios.shape}')
-        print(f'Sortino ratios head:\n{sortino_ratios[:5]}')
-        print(f'ETH index: {eth_index}')
+        # Perturb sortino ratios slightly to introduce randomness
+        perturbation = np.random.normal(loc=0, scale=0.01, size=sortino_ratios.shape)
+        print('perturbation', perturbation)
+        perturbed_sortino_ratios = sortino_ratios + perturbation
         
         weights = cp.Variable(n)
         portfolio_return = returns @ weights
-        sortino_matrix = np.tile(sortino_ratios.values.reshape(1, -1), (len(returns), 1))
-        
-        # Log the sortino_matrix and reshaped weights for debugging
-        print(f'Sortino matrix shape: {sortino_matrix.shape}')
-        print(f'Sortino matrix head:\n{sortino_matrix[:5]}')
+        sortino_matrix = np.tile(perturbed_sortino_ratios.values.reshape(1, -1), (len(returns), 1))
         
         portfolio_risk = cp.norm(returns - cp.multiply(sortino_matrix, cp.reshape(weights, (1, n))), 'fro')
-        objective = cp.Maximize(cp.sum(portfolio_return) - 0.001 * portfolio_risk)  # Adding regularization term
+        objective = cp.Maximize(cp.sum(portfolio_return) - 0.001 * portfolio_risk)
         
         # Define constraints
         constraints = [
@@ -67,31 +63,21 @@ class mvo_model():
             weights >= 0
         ]
         
-          # The upper bound for each weight is 1
-        
-        # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:
             constraints.append(weights[eth_index] >= self.eth_bound)
-
+        
         for i in range(n):
             if i != eth_index:
                 constraints.append(weights[i] <= 0.3)
-
-        
-        # Log constraints for debugging
-        print(f'Constraints: {constraints}')
         
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.CLARABEL)  # Using Clarabel as suggested in the warning
-        
-        # Log problem status and weights
-        print(f'Problem status: {problem.status}')
-        print(f'Weights value: {weights.value}')
+        problem.solve(solver=cp.CLARABEL)
         
         if weights.value is not None:
             return weights.value
         else:
             return None
+
 
 
     def rebalance_portfolio(self, data, weights):
@@ -115,7 +101,7 @@ class mvo_model():
         cumulative_return = np.exp(np.log1p(daily_portfolio_returns).cumsum()) - 1
         return cumulative_return
     
-    def rebalance(self, data, all_assets, rebalancing_frequency=7):
+    def rebalance(self, data, all_assets, rebalancing_frequency=7, seed=42):
         all_assets = np.array(all_assets)
         data_start = data.index.min()
         data = data.sort_index()
@@ -124,59 +110,35 @@ class mvo_model():
     
         # Calculate the initial optimal weights
         historical_returns = np.log(data[:data.index.get_loc(self.start_date)][[f'DAILY_PRICE_{asset}' for asset in all_assets]].pct_change().dropna() + 1)
-        print(f"Initial historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
-    
         if historical_returns.shape[0] > 0 and historical_returns.shape[1] > 0:
             sortino_ratios = historical_returns.apply(self.calculate_sortino_ratio)
-            print("Initial sortino ratios", sortino_ratios)
-    
             if not sortino_ratios.isnull().any():
                 eth_index = np.where(all_assets == 'ETH')[0][0]
-                initial_optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index)
-                print('Initial optimal weights', initial_optimal_weights)
-    
+                initial_optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index, seed)
                 if initial_optimal_weights is not None:
-                    # Set the initial composition to the initial optimal weights
                     initial_composition = initial_optimal_weights
                 else:
-                    print("No initial optimal weights found, using initial composition from data")
                     initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
             else:
-                print("Sortino ratios contain NaN, using initial composition from data")
                 initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
         else:
-            print("No returns available for initial historical period, using initial composition from data")
             initial_composition = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[0][[f'COMPOSITION_{asset}' for asset in all_assets]].values
     
         current_composition = initial_composition.copy()
         start_index = data.index.get_loc(self.start_date)
-        print('start index', start_index)
     
         for start in range(start_index, len(data)):
             end = start + 1
             period_data = data[start:end]
             if (start - start_index) % rebalancing_frequency == 0 and start != start_index:
                 historical_returns = np.log(data[:start][[f'DAILY_PRICE_{asset}' for asset in all_assets]].pct_change().dropna() + 1)
-                print(f"historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
-    
                 if historical_returns.shape[0] == 0 or historical_returns.shape[1] == 0:
-                    print(f"No returns available for historical period up to {start}")
                     continue
-                print(f"historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
-    
                 sortino_ratios = historical_returns.apply(self.calculate_sortino_ratio)
-                print("sortino ratios", sortino_ratios)
-    
                 if sortino_ratios.isnull().any():
-                    print(f"Sortino ratios contain NaN for historical period up to {start}")
                     continue
-    
-                optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index)
-                print('optimal weights', optimal_weights)
-    
-                # Ensure optimal_weights is not None
+                optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index, seed)
                 if optimal_weights is None:
-                    print(f"No optimal weights found for historical period up to {start}")
                     continue
     
                 current_composition = np.round(current_composition, decimals=10)
@@ -184,11 +146,6 @@ class mvo_model():
     
                 weight_changes = np.abs(current_composition - optimal_weights)
                 significant_changes = weight_changes >= self.threshold
-    
-                print(f"Period {start} to {end}:")
-                print(f"  Current composition: {[f'{weight:.10f}' for weight in current_composition]}")
-                print(f"  Optimal weights: {[f'{weight:.10f}' for weight in optimal_weights]}")
-                print(f"  Weight changes: {[f'{change:.10f}' for change in weight_changes]}")
     
                 if np.any(significant_changes):
                     current_composition[significant_changes] = optimal_weights[significant_changes]
@@ -200,8 +157,8 @@ class mvo_model():
                 current_composition = (current_composition * np.exp(log_returns))
                 current_composition /= current_composition.sum()
     
-            rebalanced_data.loc[period_data.index, [f'COMPOSITION_{asset}' for asset in all_assets]] = current_composition
     
         rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
     
         return rebalanced_data
+

@@ -68,7 +68,7 @@ dai_ceilings = [
         ]
 
 class SimulationEnvironment:
-    def __init__(self, simulator, start_date, end_date, agent=None, bounds=None):
+    def __init__(self, simulator, start_date, end_date, agent=None, bounds=None, strategy=None):
         self.simulator = simulator
         self.start_date = pd.to_datetime(start_date).tz_localize(None)
         self.end_date = pd.to_datetime(end_date).tz_localize(None)
@@ -79,6 +79,7 @@ class SimulationEnvironment:
         self.previous_total_portfolio_value = None  # Initialize previous total portfolio value
         self.value_change_factor = 1
         self.bounds = bounds
+        
         
     def run(self, predefined_actions=None):
         state = self.reset()  # Ensures starting from a clean state every time
@@ -249,15 +250,25 @@ class SimulationEnvironment:
         # Incorporate the scaled percentage change in total portfolio value into the reward
         reward = scaled_sortino_diff - distance_penalty + scaled_portfolio_value_change
         reward_no_scale = current_sortino_ratio - distance_penalty + scaled_portfolio_value_change
+        sortino_reward = current_sortino_ratio - 10*distance_penalty
         
         self.action_log.append({'date': self.current_date, 'Reward': reward})
         self.action_log.append({'date': self.current_date, 'Reward no scale': reward_no_scale})
+        self.action_log.append({'date': self.current_date, 'sortino reward': sortino_reward})
 
         self.dai_ceiling = self.simulator.data[dai_ceilings]
         self.action_log.append({'date': self.current_date, 'dai ceilings': self.dai_ceiling})
         print('reward no scale', reward_no_scale)
-        
-        return reward_no_scale, current_weights
+        print('sortino reward', sortino_reward)
+        self.action_log.append({'date': self.current_date, 'reward type': self.agent.reward_type})
+        if self.agent.reward_type == 'Aggressive':
+            
+            print('aggressive reward', sortino_reward)
+            return sortino_reward, current_weights
+        else:
+            print('balanced reward', reward_no_scale)
+            return reward_no_scale, current_weights
+            
 
 """
 

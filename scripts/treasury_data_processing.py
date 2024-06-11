@@ -351,6 +351,8 @@ print(asset_prices)
 panama_dao_start_date = panamadao_returns['DAY'].iloc[0]
 panama_dao_start_date
 
+panama_dao_end_date = panamadao_returns['DAY'].iloc[-1]
+
 
 # In[45]:
 
@@ -499,3 +501,19 @@ indicies
 combined_all_assets = combined_all_assets.fillna(0)
 
 historical_returns.set_index('DAY', inplace=True)
+
+"""
+    panama_dao_initial_comp.index = panama_dao_initial_comp.index.str.replace('COMPOSITION_', '', regex=False)
+
+    fig_initial_comp = px.pie(
+        names=panama_dao_initial_comp.index,
+        values=panama_dao_initial_comp.values,
+        title="Initial Composition"
+    )
+    #st.write(panama_dao_initial_comp)
+    st.plotly_chart(fig_initial_comp)
+    #iniital_composition.plot.pie(figsize=(10, 10), autopct='%1.1f%%')
+
+    #st.write('Selected Assets:', selected_assets)
+    #st.write('ETH Bound', eth_bound)
+    """

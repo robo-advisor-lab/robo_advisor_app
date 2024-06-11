@@ -121,7 +121,7 @@ class mvo_model():
         data = data.sort_index()
         data = data.loc[(data.index >= data_start) & (data.index <= self.end_date)]
         rebalanced_data = data.copy()
-        
+    
         # Calculate the initial optimal weights
         historical_returns = np.log(data[:data.index.get_loc(self.start_date)][[f'DAILY_PRICE_{asset}' for asset in all_assets]].pct_change().dropna() + 1)
         print(f"Initial historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
@@ -129,12 +129,12 @@ class mvo_model():
         if historical_returns.shape[0] > 0 and historical_returns.shape[1] > 0:
             sortino_ratios = historical_returns.apply(self.calculate_sortino_ratio)
             print("Initial sortino ratios", sortino_ratios)
-        
+    
             if not sortino_ratios.isnull().any():
                 eth_index = np.where(all_assets == 'ETH')[0][0]
                 initial_optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index)
                 print('Initial optimal weights', initial_optimal_weights)
-                
+    
                 if initial_optimal_weights is not None:
                     # Set the initial composition to the initial optimal weights
                     initial_composition = initial_optimal_weights
@@ -151,11 +151,11 @@ class mvo_model():
         current_composition = initial_composition.copy()
         start_index = data.index.get_loc(self.start_date)
         print('start index', start_index)
-        
+    
         for start in range(start_index, len(data)):
             end = start + 1
             period_data = data[start:end]
-            if start % rebalancing_frequency == 0 and start != start_index:
+            if (start - start_index) % rebalancing_frequency == 0 and start != start_index:
                 historical_returns = np.log(data[:start][[f'DAILY_PRICE_{asset}' for asset in all_assets]].pct_change().dropna() + 1)
                 print(f"historical_returns index start {historical_returns.index.min()} through {historical_returns.index.max()}")
     
@@ -173,12 +173,12 @@ class mvo_model():
     
                 optimal_weights = self.mvo_sortino(historical_returns.values, sortino_ratios, eth_index)
                 print('optimal weights', optimal_weights)
-                
+    
                 # Ensure optimal_weights is not None
                 if optimal_weights is None:
                     print(f"No optimal weights found for historical period up to {start}")
                     continue
-                
+    
                 current_composition = np.round(current_composition, decimals=10)
                 optimal_weights = np.round(optimal_weights, decimals=10)
     
@@ -201,7 +201,7 @@ class mvo_model():
                 current_composition /= current_composition.sum()
     
             rebalanced_data.loc[period_data.index, [f'COMPOSITION_{asset}' for asset in all_assets]] = current_composition
-        
+    
         rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
-        
+    
         return rebalanced_data

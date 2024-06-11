@@ -4,6 +4,7 @@ from stable_baselines3 import PPO
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize, Bounds, LinearConstraint
+import random
 
 from scripts.treasury_utils import calculate_sortino_ratio, mvo, calculate_log_returns
 
@@ -38,15 +39,22 @@ class PortfolioEnv(gym.Env):
         self.previous_action = np.ones(self.num_assets) / self.num_assets  # Set initial action
         self.reset()
 
+    def seed(self, seed=None):
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+
     def reset(self):
         if self.start_date:
             pos = self.data.index.searchsorted(self.start_date)
             if pos >= len(self.data.index):
                 raise ValueError(f"Start date {self.start_date} is out of the range of the data index.")
             self.current_step = pos
+            self.start_step = pos
         else:
             self.current_step = 0
-
+            self.start_step = 0
+    
         if self.end_date:
             pos = self.data.index.searchsorted(self.end_date)
             if pos >= len(self.data.index):
@@ -54,20 +62,34 @@ class PortfolioEnv(gym.Env):
             self.end_step = pos
         else:
             self.end_step = len(self.data) - 1
-
+    
         self.done = False
         self.portfolio = self.initial_composition
         self.actions_log = []
         self.returns_log = []
         self.composition_log = [(self.data.index[self.current_step], self.portfolio.copy())]
         self.returns_log.append((self.data.index[self.current_step], 0))
-
+    
         # Perform the initial action
         action = self.previous_action
         self.portfolio = normalize_portfolio(action)
         self.actions_log.append((self.data.index[self.current_step], action))
         return self._next_observation()
 
+
+        
+    def _apply_eth_bound(self):
+        if self.portfolio[self.eth_index] < self.eth_bound:
+            diff = self.eth_bound - self.portfolio[self.eth_index]
+            remaining_allocation = 1 - self.eth_bound
+    
+            self.portfolio[self.eth_index] = self.eth_bound
+            other_weights = np.delete(self.portfolio, self.eth_index)
+            other_weights = other_weights / np.sum(other_weights) * remaining_allocation
+            self.portfolio = np.insert(other_weights, self.eth_index, self.eth_bound)
+            self.portfolio = normalize_portfolio(self.portfolio)
+
+            
     def _next_observation(self):
         prices = self.data.iloc[self.current_step][[f'DAILY_PRICE_{asset}' for asset in self.all_assets]].fillna(0).values
         obs = np.concatenate([self.portfolio, prices])
@@ -81,105 +103,77 @@ class PortfolioEnv(gym.Env):
         if self.done or self.current_step >= self.end_step:
             self.done = True
             return self._next_observation(), 0, self.done, {}
-
+    
         current_prices = self.data.iloc[self.current_step][[f'DAILY_PRICE_{asset}' for asset in self.all_assets]].fillna(0).values
         if self.current_step > 0:
             prev_prices = self.data.iloc[self.current_step - 1][[f'DAILY_PRICE_{asset}' for asset in self.all_assets]].values
             prev_prices = np.nan_to_num(prev_prices, nan=1.0)  # Replace NaNs with 1.0 to avoid invalid log returns
         else:
             prev_prices = current_prices
-
-        # Additional check for NaNs in prices
-        if np.any(np.isnan(current_prices)) or np.any(np.isnan(prev_prices)):
-            print(f"NaN values in prices at step {self.current_step}: current_prices: {current_prices}, prev_prices: {prev_prices}")
-            raise ValueError("Prices contain NaN values")
-
+    
         log_returns = np.log(current_prices / prev_prices)
-
         new_portfolio_values = self.portfolio * np.exp(log_returns)
         sum_new_portfolio_values = np.sum(new_portfolio_values)
-
-        # Normalize new portfolio values to ensure the sum is 1
-        if sum_new_portfolio_values != 0:
-            self.portfolio = new_portfolio_values / sum_new_portfolio_values
-        else:
-            self.portfolio = new_portfolio_values
-
+        self.portfolio = new_portfolio_values / sum_new_portfolio_values if sum_new_portfolio_values != 0 else new_portfolio_values
         self.portfolio = normalize_portfolio(new_portfolio_values)
-
-        # Additional check for NaNs in portfolio
-        if np.any(np.isnan(self.portfolio)):
-            print(f"NaN values in portfolio after normalization at step {self.current_step}: {self.portfolio}")
-
+    
+        # Debugging: Print current step and rebalancing frequency
+        print(f"Current Step: {self.current_step}, Rebalancing Frequency: {self.rebalancing_frequency}")
+    
         # Rebalance the portfolio at the specified frequency or on the first step
-        if self.current_step == 0 or self.current_step % self.rebalancing_frequency == 0:
+        if self.current_step == self.start_step or (self.current_step - self.start_step) % self.rebalancing_frequency == 0:
+            print('Rebalancing Portfolio')
             action = np.clip(action, 0, 1)
             action_sum = np.sum(action)
-            if action_sum == 0:
-                action_sum = 1e-8
-
-            action = action / action_sum
-
-            self.portfolio = normalize_portfolio(action)  # Normalize action to ensure it sums to 1
-            self.previous_action = action  # Store the current action as the previous action
-            self.actions_log.append((self.data.index[self.current_step], action))
-
+            action = action / action_sum if action_sum != 0 else action
+            self.portfolio = normalize_portfolio(action)
+            
             # Ensure ETH allocation meets the minimum bound if specified
             if self.portfolio[self.eth_index] < self.eth_bound:
                 diff = self.eth_bound - self.portfolio[self.eth_index]
                 remaining_allocation = 1 - self.eth_bound
-
                 self.portfolio[self.eth_index] = self.eth_bound
                 other_weights = np.delete(self.portfolio, self.eth_index)
                 other_weights = other_weights / np.sum(other_weights) * remaining_allocation
                 self.portfolio = np.insert(other_weights, self.eth_index, self.eth_bound)
                 self.portfolio = normalize_portfolio(self.portfolio)
-
-            # Additional check for NaNs in portfolio after rebalancing
-            if np.any(np.isnan(self.portfolio)):
-                print(f"NaN values in portfolio after rebalancing at step {self.current_step}: {self.portfolio}")
-
-        self.portfolio = normalize_portfolio(self.portfolio)
-
+    
+            self.previous_action = self.portfolio
+            self.actions_log.append((self.data.index[self.current_step], self.portfolio))
+    
         self.composition_log.append((self.data.index[self.current_step], self.portfolio.copy()))
-
-        #self.portfolio = normalize_portfolio(self.portfolio)
-        print('mvo log returns', log_returns)
-        print('portfolio', self.portfolio)
-        
+    
         portfolio_return = np.sum(log_returns * self.portfolio)
-
         self.returns_log.append((self.data.index[self.current_step], portfolio_return))
-
+    
         if len(self.returns_log) > 0:
             sortino_ratio = calculate_sortino_ratio([r for _, r in self.returns_log], self.risk_free)
         else:
             sortino_ratio = 0
-
+    
         optimized_weights, _, composition, _ = mvo(self.data.iloc[:self.current_step + 1], self.all_assets, self.risk_free)
-        if optimized_weights is not None:
-            current_weights = composition.iloc[-1].values
-            max_distance = sum(abs(1 - value) for value in optimized_weights)
-            distance_penalty = sum(abs(current_weights[i] - optimized_weights[i]) for i in range(len(optimized_weights))) / max_distance if max_distance != 0 else 0
-        else:
-            distance_penalty = 0
-
+        current_weights = composition.iloc[-1].values if optimized_weights is not None else None
+        max_distance = sum(abs(1 - value) for value in optimized_weights) if optimized_weights is not None else 0
+        distance_penalty = sum(abs(current_weights[i] - optimized_weights[i]) for i in range(len(optimized_weights))) / max_distance if max_distance != 0 else 0
+    
         reward = portfolio_return + 2 * sortino_ratio - distance_penalty
         obs = self._next_observation()
         self.current_step += 1
-
-        # Apply the previous action if no new action is provided
-        if action is None:
-            action = self.previous_action
-
+    
         return obs, reward, self.done, {}
 
-def train_rl_agent(data, all_assets, eth_bound, risk_free, rebalancing_frequency=7, start_date=None, end_date=None):
+
+def train_rl_agent(data, all_assets, eth_bound, risk_free, rebalancing_frequency=7, start_date=None, end_date=None, seed=None):
     data_start_date = data.index.min()
     initial_composition = data.loc[data.index >= start_date][[f'COMPOSITION_{asset}' for asset in all_assets]].to_numpy()[0]
     initial_composition = np.nan_to_num(initial_composition)  # Ensure no NaNs in initial composition
     data = data.loc[(data.index >= data_start_date) & (data.index <= end_date)]
     env = PortfolioEnv(data=data, initial_composition=initial_composition, all_assets=all_assets, eth_bound=eth_bound, risk_free=risk_free, rebalancing_frequency=rebalancing_frequency, start_date=start_date, end_date=end_date)
+
+    if seed is not None:
+        env.seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
 
     model = PPO('MlpPolicy', env, verbose=1)
 
@@ -196,6 +190,7 @@ def train_rl_agent(data, all_assets, eth_bound, risk_free, rebalancing_frequency
             print("Portfolio:", env.portfolio)
 
         action, _ = model.predict(obs)
+        print('action', action)
         action = np.clip(action, 0, 1)
         action_sum = np.sum(action)
         if action_sum == 0:

@@ -40,7 +40,7 @@ np.random.seed(42)
 tf.random.set_seed(42)
 """
 class RlAgent:
-    def __init__(self, action_space, target_weights, vault_action_ranges, learning_rate=0.01, discount_factor=0.95,
+    def __init__(self, action_space, target_weights, vault_action_ranges, reward_type='Balanced', learning_rate=0.01, discount_factor=0.95,
                  exploration_rate=0.9, exploration_decay=0.95, min_exploration_rate=0.01, initial_strategy_period=0,
                  adjustment_scale=10):
         self.q_table = {}
@@ -56,6 +56,7 @@ class RlAgent:
         self.current_cycle = 0
         self.adjustment_scale = adjustment_scale
         self.dai_ceilings = None
+        self.reward_type = reward_type
 
     def random_action(self, state):
         """
@@ -69,6 +70,8 @@ class RlAgent:
 
     def get_state_representation(self, state):
         return tuple(state.values())
+
+    
 
     def calculate_adjustment(self, current, target, vault):
         print('vault', vault)

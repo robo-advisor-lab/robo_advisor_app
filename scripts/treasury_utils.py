@@ -135,22 +135,26 @@ def normalize(data, date):
     if 'index' in cumulative_return_df.columns:
         cumulative_return_df = cumulative_return_df.rename(columns={'index': 'DAY'})
 
+    # Check for and handle duplicate 'DAY' columns
+    if cumulative_return_df.columns.duplicated().any():
+        cumulative_return_df = cumulative_return_df.loc[:, ~cumulative_return_df.columns.duplicated()]
+
     # Convert the 'DAY' column to datetime if it's not already
     cumulative_return_df['DAY'] = pd.to_datetime(cumulative_return_df['DAY'])
 
     # Filter the DataFrame to start from the specified date
     cumulative_return_df = cumulative_return_df[cumulative_return_df['DAY'] >= pd.to_datetime(date)]
-    
+
     # Prepare base return (use cumulative_return as the base)
     base_return = cumulative_return_df.copy().dropna()
     print('base return', base_return)
-    
+
     # Drop any existing columns and rename them
     base_return = base_return[['DAY', 'cumulative_return']].rename(columns={'cumulative_return': 'base_cumulative_return'})
 
     # Combine results
     combined = base_return.sort_values('DAY')
-    
+
     # Check if combined is empty
     if combined.empty:
         print("Warning: No data available after the specified start date.")
@@ -160,11 +164,11 @@ def normalize(data, date):
     # Normalize returns
     first_value = combined['base_cumulative_return'].iloc[0]  # Get the first value
     combined['treasury_return'] = 100 + (100 * (combined['base_cumulative_return'] - first_value))
-    
+
     # Final output
     normalized_returns = combined[['DAY', 'treasury_return']]
     normalized_returns.set_index('DAY', inplace=True)
-    
+
     return normalized_returns
 
 
