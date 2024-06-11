@@ -134,9 +134,17 @@ The implementation of these advisors sets a new standard for treasury management
 
 #### Upcoming Features and Developments
 
+* **Development of Solidity contracts and integration with Python Script:**&#x20;
 * **Sharpe and Treynor Ratio Calculations**: Additional performance metrics for comprehensive evaluation.
 * **Value at Risk (VaR) and Conditional Value at Risk (CVaR)**: Advanced risk measures.
 * **Integration with More Assets**: Expanding the asset universe for broader applicability.
+* **Add dynamic rebalancing for vault model:**
+*   **Integration of Web3 Wallets for Logging and Submission**
+
+    In the future, users will have the ability to link their Web3 wallets to log their simulation runs. This feature will allow users to automatically track and record their optimal runs, which can then be submitted to the DAO Lab for evaluation and training purposes.
+*   **Crowdsourced Optimization and Governance Token Rewards**
+
+    Users who contribute their optimal runs to the DAO Lab will be rewarded with a governance token. This token incentivizes participation and feedback, effectively crowdsourcing the testing and optimization process. The DAO Lab will use these submissions to refine and enhance the models, benefiting from a wide range of real-world data and scenarios..
 
 #### Partnerships and Expansions
 
