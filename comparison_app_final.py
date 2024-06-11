@@ -87,7 +87,7 @@ def treasury_advisor(rebalance_frequency, selected_assets, eth_bound, start_date
     # MVO Model
     mvo_rebalancing_frequency = rebalance_frequency
     threshold = 0
-    model = mvo_model(eth_bound, current_risk_free, treasury_start_date, treasury_end_date, random_seed)
+    model = mvo_model(eth_bound, current_risk_free, treasury_start_date, treasury_end_date, threshold)
     st.sidebar.write(f"Rebalancing MVO model starting {treasury_start_date}...")
     rebalanced_data = model.rebalance(filtered_data_treasury, filtered_assets, mvo_rebalancing_frequency)
     st.sidebar.write("MVO model rebalancing completed.")

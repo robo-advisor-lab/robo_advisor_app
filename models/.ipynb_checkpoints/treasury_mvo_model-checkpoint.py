@@ -64,7 +64,8 @@ class mvo_model():
         # Define constraints
         constraints = [
             cp.sum(weights) == 1,
-            weights >= 0
+            weights >= 0,
+            #weights <= 0.3
         ]
         
           # The upper bound for each weight is 1
@@ -82,7 +83,7 @@ class mvo_model():
         print(f'Constraints: {constraints}')
         
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.CLARABEL)  # Using Clarabel as suggested in the warning
+        problem.solve(solver=cp.SCS)  # Using Clarabel as suggested in the warning
         
         # Log problem status and weights
         print(f'Problem status: {problem.status}')
@@ -184,24 +185,31 @@ class mvo_model():
     
                 weight_changes = np.abs(current_composition - optimal_weights)
                 significant_changes = weight_changes >= self.threshold
+                print(f"threshold:{self.threshold}")
     
                 print(f"Period {start} to {end}:")
                 print(f"  Current composition: {[f'{weight:.10f}' for weight in current_composition]}")
                 print(f"  Optimal weights: {[f'{weight:.10f}' for weight in optimal_weights]}")
                 print(f"  Weight changes: {[f'{change:.10f}' for change in weight_changes]}")
+                print(f"  Significant changes: {significant_changes}")
     
                 if np.any(significant_changes):
                     current_composition[significant_changes] = optimal_weights[significant_changes]
                     current_composition /= current_composition.sum()
+                    print(f"  Updated composition: {[f'{weight:.10f}' for weight in current_composition]}")
             else:
                 current_prices = data.iloc[start][[f'DAILY_PRICE_{asset}' for asset in all_assets]].values
                 previous_prices = data.iloc[start-1][[f'DAILY_PRICE_{asset}' for asset in all_assets]].values
                 log_returns = np.log(current_prices / previous_prices)
                 current_composition = (current_composition * np.exp(log_returns))
                 current_composition /= current_composition.sum()
+                print(f"  Log returns: {[f'{ret:.10f}' for ret in log_returns]}")
+                print(f"  Updated composition (log returns applied): {[f'{weight:.10f}' for weight in current_composition]}")
     
             rebalanced_data.loc[period_data.index, [f'COMPOSITION_{asset}' for asset in all_assets]] = current_composition
     
         rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
     
         return rebalanced_data
+    
+        

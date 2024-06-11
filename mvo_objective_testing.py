@@ -1,25 +1,17 @@
-import gymnasium as gym
-from gymnasium import spaces
-from stable_baselines3 import PPO
-import plotly.graph_objs as go
-import streamlit as st
-import pandas as pd
-import numpy as np
-import datetime
-import random
-import cvxpy as cp
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-from scripts.treasury_utils import calculate_sortino_ratio, mvo, calculate_log_returns
+from scripts.treasury_data_processing import combined_all_assets, current_risk_free
 
-class mvo_model():
-    def __init__(self, eth_bound, current_risk_free, start_date, end_date, threshold=0):
-        self.threshold = threshold
-        self.current_risk_free = current_risk_free
-        self.start_date = start_date
-        self.end_date = end_date 
+import numpy as np
+import pandas as pd
+import cvxpy as cp
+
+
+
+class PortfolioOptimizer:
+    def __init__(self, eth_bound=0):
         self.eth_bound = eth_bound
-    
+        self.threshold = 1e-5
+        self.current_risk_free = current_risk_free
+
     def calculate_sortino_ratio(self, returns):
         risk_free = self.current_risk_free
         daily_risk_free_rate = (1 + risk_free) ** (1/365) - 1
@@ -38,7 +30,7 @@ class mvo_model():
         print('sortino ratio', sortino_ratio)
     
         return sortino_ratio
-    
+
     def mvo_sortino(self, returns, sortino_ratios, eth_index):
         n = returns.shape[1]
         print('n for weights', n)
@@ -65,25 +57,18 @@ class mvo_model():
         constraints = [
             cp.sum(weights) == 1,
             weights >= 0,
-            #weights <= 0.3
+            weights <= 0.3  # Setting an upper bound for each weight
         ]
-        
-          # The upper bound for each weight is 1
         
         # Add the constraint for ETH only if eth_bound is greater than 0
         if self.eth_bound > 0:
             constraints.append(weights[eth_index] >= self.eth_bound)
 
-        for i in range(n):
-            if i != eth_index:
-                constraints.append(weights[i] <= 0.3)
-
-        
         # Log constraints for debugging
         print(f'Constraints: {constraints}')
         
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.SCS)  # Using Clarabel as suggested in the warning
+        problem.solve(solver=cp.CLARABEL)  # Using Clarabel as suggested in the warning
         
         # Log problem status and weights
         print(f'Problem status: {problem.status}')
@@ -94,28 +79,6 @@ class mvo_model():
         else:
             return None
 
-
-    def rebalance_portfolio(self, data, weights):
-        compositions = np.outer(np.ones(len(data)), weights)
-        return compositions
-    
-    def calculate_daily_portfolio_returns(self, data, all_assets):
-        all_assets = np.array(all_assets)
-        current_prices = data[[f'DAILY_PRICE_{asset}' for asset in all_assets]].values
-        print('current_prices', current_prices)
-        prev_prices = data[[f'DAILY_PRICE_{asset}' for asset in all_assets]].shift(1).fillna(method='ffill').values
-        print('prev_prices', prev_prices)
-        log_returns = np.log(current_prices / prev_prices)
-        print('log returns', log_returns)
-        composition_columns = [f'COMPOSITION_{asset}' for asset in all_assets]
-        daily_portfolio_returns = (log_returns * data[composition_columns].shift(1).fillna(0)).sum(axis=1)
-        return daily_portfolio_returns
-    
-    def calculate_cumulative_return(self, daily_portfolio_returns):
-        daily_portfolio_returns = daily_portfolio_returns[daily_portfolio_returns.index >= self.start_date]
-        cumulative_return = np.exp(np.log1p(daily_portfolio_returns).cumsum()) - 1
-        return cumulative_return
-    
     def rebalance(self, data, all_assets, rebalancing_frequency=7):
         all_assets = np.array(all_assets)
         data_start = data.index.min()
@@ -185,31 +148,39 @@ class mvo_model():
     
                 weight_changes = np.abs(current_composition - optimal_weights)
                 significant_changes = weight_changes >= self.threshold
-                print(f"threshold:{self.threshold}")
     
                 print(f"Period {start} to {end}:")
                 print(f"  Current composition: {[f'{weight:.10f}' for weight in current_composition]}")
                 print(f"  Optimal weights: {[f'{weight:.10f}' for weight in optimal_weights]}")
                 print(f"  Weight changes: {[f'{change:.10f}' for change in weight_changes]}")
-                print(f"  Significant changes: {significant_changes}")
     
                 if np.any(significant_changes):
                     current_composition[significant_changes] = optimal_weights[significant_changes]
                     current_composition /= current_composition.sum()
-                    print(f"  Updated composition: {[f'{weight:.10f}' for weight in current_composition]}")
             else:
                 current_prices = data.iloc[start][[f'DAILY_PRICE_{asset}' for asset in all_assets]].values
                 previous_prices = data.iloc[start-1][[f'DAILY_PRICE_{asset}' for asset in all_assets]].values
                 log_returns = np.log(current_prices / previous_prices)
                 current_composition = (current_composition * np.exp(log_returns))
                 current_composition /= current_composition.sum()
-                print(f"  Log returns: {[f'{ret:.10f}' for ret in log_returns]}")
-                print(f"  Updated composition (log returns applied): {[f'{weight:.10f}' for weight in current_composition]}")
     
             rebalanced_data.loc[period_data.index, [f'COMPOSITION_{asset}' for asset in all_assets]] = current_composition
     
         rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
     
         return rebalanced_data
-    
-        
+
+# Initialize the PortfolioOptimizer class
+optimizer = PortfolioOptimizer(eth_bound=0.1)  # Example ETH bound
+
+# Example data and assets
+data = combined_all_assets
+
+all_assets = ['ETH', 'WBTC', 'WETH']
+optimizer.start_date = '2023-03-22'
+optimizer.end_date = '2023-04-05'
+
+# Rebalance the portfolio
+rebalanced_data = optimizer.rebalance(data, all_assets, 1)
+print(rebalanced_data)
+rebalanced_data.plot()
