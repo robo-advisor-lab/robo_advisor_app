@@ -308,7 +308,20 @@ if agent_class == "Treasury":
     treasury_starting_date = datetime.combine(treasury_starting_date, datetime.min.time())
     treasury_ending_date = datetime.combine(treasury_ending_date, datetime.min.time())
     treasury_ending_date = treasury_ending_date + timedelta(days=1)
-    bounds = st.session_state['vault_bounds']
+    if 'vault_bounds' not in st.session_state:
+        st.session_state['vault_bounds'] = {
+            'BTC Vault_collateral_usd': (0.3, 0.3),
+            'ETH Vault_collateral_usd': (0.1, 0.5),
+            'stETH Vault_collateral_usd': (0.1, 0.3),
+            'Stablecoin Vault_collateral_usd': (0.05, 0.1),
+            'Altcoin Vault_collateral_usd': (0.05, 0.1),
+            'LP Vault_collateral_usd': (0.05, 0.1),
+            'RWA Vault_collateral_usd': (0.05, 0.05),
+            'PSM Vault_collateral_usd': (0.05, 0.2)
+        }
+    bounds = st.session_state['vault_bounds'] 
+    reward_type = st.session_state['reward_type'] if 'reward_type' in st.session_state else 'Balanced'
+    initial_strategy_period = st.session_state['initial_strategy_period'] if 'initial_strategy_period' in st.session_state else 1
     #initial_strategy_period = st.session_state['initial_strategy_period']
 
     #st.write(treasury_starting_date)
@@ -328,6 +341,7 @@ else:
     eth_bound = 0
     vault_starting_date = st.sidebar.date_input('Start Date', value=vault_min_start_date, min_value=vault_min_start_date, max_value = vault_min_start_date)
     vault_ending_date = st.sidebar.date_input('End Date', value=vault_min_end_date, min_value=vault_min_start_date + timedelta(days=7), max_value=vault_min_end_date)
+    
     def get_user_bounds():
         bounds = {}
         bounds['BTC Vault_collateral_usd'] = (st.sidebar.number_input("Lower bound for BTC Vault", min_value=0.05, max_value=0.3, value=0.3, step=0.01),
