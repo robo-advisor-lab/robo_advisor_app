@@ -45,24 +45,26 @@ def mvo(data, bounds, annual_risk_free_rate=0.05, penalty_factor=10000):  # Incr
                       'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd']]
     log_returns = np.log(portfolio / portfolio.shift(1))
     log_returns.fillna(0, inplace=True)
+    returns = log_returns
     
     total_portfolio_value = portfolio.sum(axis=1)
     composition = portfolio.divide(total_portfolio_value, axis=0)
-    
     daily_risk_free_rate = (1 + annual_risk_free_rate) ** (1/365) - 1
-    excess_returns = log_returns.subtract(daily_risk_free_rate, axis=0)
-    
-    downside_returns = np.where(log_returns < daily_risk_free_rate, log_returns - daily_risk_free_rate, 0)
-    daily_downside_deviation = np.sqrt((downside_returns ** 2).mean())
+    excess_returns = returns - daily_risk_free_rate
+    downside_returns = np.where(excess_returns < 0, excess_returns**2, 0)
+    daily_downside_deviation = np.sqrt(downside_returns.mean())
+    active_days = returns.notna().sum().max()
+    annual_factor = 365 / active_days
+    compounding_return = (1 + excess_returns).prod() ** annual_factor - 1
     annual_downside_deviation = daily_downside_deviation * np.sqrt(365)
+    sortino_ratios = compounding_return / annual_downside_deviation if annual_downside_deviation != 0 else np.inf
     
-    annualized_returns = excess_returns.mean() * 365
-    sortino_ratios = annualized_returns / annual_downside_deviation if annual_downside_deviation != 0 else np.inf
     print("Individual Sortino Ratios:", sortino_ratios)
 
     def sortino_ratio(weights):
         portfolio_returns = np.sum(weights * excess_returns, axis=1)
-        annualized_returns = np.mean(portfolio_returns) * 365
+        excess_portfolio_returns = portfolio_returns - daily_risk_free_rate
+        annualized_returns = (1 + excess_portfolio_returns).prod() ** (365 / len(excess_portfolio_returns)) - 1
         downside_deviation = np.sqrt(np.mean(np.minimum(0, portfolio_returns - daily_risk_free_rate) ** 2)) * np.sqrt(365)
         
         lower_bounds = np.array([bounds[vault][0] for vault in portfolio.columns])
@@ -85,7 +87,7 @@ def mvo(data, bounds, annual_risk_free_rate=0.05, penalty_factor=10000):  # Incr
         raise Exception('Optimization did not converge')
 
 
-
+        
 
 def optimized_sortino(returns_df, weights, annual_risk_free_rate=0.05):
     """

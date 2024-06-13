@@ -5,7 +5,6 @@ import seaborn as sns
 import random
 import time
 from datetime import timedelta
-from datetime import datetime
 
 # Machine learning tools
 from sklearn.linear_model import LinearRegression, Ridge, MultiTaskLassoCV
@@ -42,16 +41,6 @@ import matplotlib as mpl
 import plotly.subplots as sp
 import plotly.graph_objs as go
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import ScalarFormatter
-import matplotlib as mpl
-import plotly.subplots as sp
-import plotly.graph_objs as go
-
-from sklearn.model_selection import KFold, GridSearchCV
-from scripts.vault_data_processing import targets, features, temporals, dai_ceilings
-import torch
-
 # Disable scientific notation globally
 mpl.rcParams['axes.formatter.useoffset'] = False
 mpl.rcParams['axes.formatter.use_locale'] = False
@@ -64,43 +53,13 @@ def apply_scalar_formatter(ax):
             axis.get_major_formatter().set_scientific(False)
             axis.get_major_formatter().set_useOffset(False)
 
-#from vault_data_processing import test_data, targets, features, temporals, dai_ceilings, vault_names, key_mapping
-from vault_utils import mvo, historical_sortino, visualize_mvo_results, evaluate_predictions, generate_action_space, calc_cumulative_return, evaluate_multi_predictions, abbreviate_number
-
-#test_data = pd.read_csv('data/csv/filtered_test_data.csv')
-
-test_data = pd.read_csv('data/csv/filtered_test_data.csv')
-# Convert index to datetime and ensure no timezone information
-
-
-test_data.set_index('day', inplace=True)
-test_data.index = pd.to_datetime(test_data.index).tz_localize(None)
-
-vault_names = [
-    'BTC Vault_collateral_usd', 'ETH Vault_collateral_usd', 'stETH Vault_collateral_usd', 'Stablecoin Vault_collateral_usd', 
-    'Altcoin Vault_collateral_usd', 'LP Vault_collateral_usd', 'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd'
-]
-
-# Map from the detailed keys to simplified keys used in optimized_weight_dict
-key_mapping = {
-    'BTC Vault_collateral_usd',
-    'ETH Vault_collateral_usd',
-    'stETH Vault_collateral_usd',
-    'Stablecoin Vault_collateral_usd'
-    'Altcoin Vault_collateral_usd',
-    'LP Vault_collateral_usd',
-    'RWA Vault_collateral_usd',
-    'PSM Vault_collateral_usd'
-}
-
-
+"""
 random.seed(42)
 np.random.seed(42)
 tf.random.set_seed(42)
-torch.manual_seed(42)
-
-class RL_VaultSimulator:
-    def __init__(self, data, initial_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250, alpha=100, lp_volatility_scale=0.5):
+"""
+class MVO_VaultSimulator:
+    def __init__(self, data, initial_data, features, targets, temporals, start_date, end_date, scale_factor=300000000,minimum_value_factor=0.05,volatility_window=250, alpha=100):
         self.data = data[data.index <= pd.to_datetime(start_date).tz_localize(None)]
         self.features = features
         self.targets = targets
@@ -116,7 +75,6 @@ class RL_VaultSimulator:
         self.volatility_window = volatility_window
         self.scale_factor = scale_factor
         self.minimum_value_factor = minimum_value_factor
-        self.lp_volatility_scale = lp_volatility_scale  # Add new parameter
 
 
     def get_latest_data(self):
@@ -193,7 +151,7 @@ class RL_VaultSimulator:
 
 
     def apply_action(self, action):
-        base_value_if_zero = 10000  # Base value to set if the initial DAI ceiling is zero
+        base_value_if_zero = 5000000  # Base value to set if the initial DAI ceiling is zero
         if action:
             for vault, percentage_change in action.items():
                 # Append the suffix '_dai_ceiling' to the vault name to match the DataFrame columns
@@ -219,22 +177,28 @@ class RL_VaultSimulator:
 
     def forecast(self, X, volatilities):
         predictions = self.model.predict(X)
-        predictions = np.maximum(predictions, 0)
-
-        scale_factor = self.scale_factor
+        predictions = np.maximum(predictions, 0)  # Ensure predictions are non-negative before adjustment
+        
+        # Scale factor for volatility should be set based on historical volatility analysis
+        scale_factor = self.scale_factor  # This should be calibrated based on your data
         noise = np.random.normal(0, volatilities * scale_factor, predictions.shape)
-        minimum_value = self.minimum_value_factor * self.initial_data[self.targets].mean()
+        
+        # Apply noise and ensure predictions do not fall below a realistic minimum
+        minimum_value = self.minimum_value_factor * self.initial_data[self.targets].mean()  # This is an example and should be adjusted
         adjusted_predictions = np.maximum(predictions + noise, minimum_value)
-
+        print('before lp adjusted predictions', adjusted_predictions)
         # Apply specific adjustments for the LP vault
         lp_vault_index = self.targets.index('LP Vault_collateral_usd')
         if lp_vault_index is not None:
-            lp_volatility_cap = volatilities[lp_vault_index] * scale_factor * self.lp_volatility_scale  # Use lp_volatility_scale
+            # Apply a different volatility adjustment or cap the volatility for the LP vault
+            #lp vol @ 0.89
+            lp_volatility_cap = volatilities[lp_vault_index] * scale_factor * 0.5  # Example adjustment
             lp_noise = np.random.normal(0, lp_volatility_cap, adjusted_predictions[:, lp_vault_index].shape)
             adjusted_predictions[:, lp_vault_index] = np.maximum(predictions[:, lp_vault_index] + lp_noise, minimum_value[lp_vault_index])
 
+        print('after lp adjusted predictions', adjusted_predictions)
+        
         return adjusted_predictions
-
 
         # try scale 453000000, min val .12 or .1, window 25 or 15
 
@@ -256,14 +220,15 @@ class RL_VaultSimulator:
         lp_vault = 'LP Vault_collateral_usd'
         print('lp vol before', volatility[lp_vault])
         if lp_vault in volatility.columns:
-            # Apply the lp_volatility_scale factor for the LP vault
-            volatility[lp_vault] *= self.lp_volatility_scale
-            print('lp vol after', volatility[lp_vault])
-    
+            # Apply a different scale factor or adjustment for the LP vault
+            lp_scale_factor = 0.5  # Example adjustment factor, you can tweak this value
+            volatility[lp_vault] *= lp_scale_factor
+            print('lp vol', volatility[lp_vault])
+
         print('all vol after', volatility.describe())
     
         # Return the average volatility over the window
-        return volatility.mean(axis=0)  # Use axis=0 to average volatilities across columns if neededis=0 to average volatilities across columns if needed
+        return volatility.mean(axis=0)  # Use axis=0 to average volatilities across columns if needed
 
 
 
@@ -419,167 +384,72 @@ class RL_VaultSimulator:
             except KeyError:
                 print(f"Data for {vault} Vault not available in the dataset.")
 
-
-test_data_copy = test_data.copy()
-
-from sklearn.model_selection import GridSearchCV
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.linear_model import Ridge
-import numpy as np
-
-def tune_model_hyperparameters(simulator, param_grid):
-    X = simulator.initial_data[simulator.features]
-    y = simulator.initial_data[simulator.targets]
-
-    model = MultiOutputRegressor(Ridge())
-
-    # Define grid search
-    grid_search = GridSearchCV(model, param_grid, cv=3, scoring='neg_mean_squared_error', verbose=1, n_jobs=-1)
-    
-    # Fit grid search
-    grid_search.fit(X, y)
-
-    # Update simulator model with best parameters
-    simulator.model = grid_search.best_estimator_
-    simulator.alpha = grid_search.best_params_['estimator__alpha']
-    best_alpha = grid_search.best_params_
-    return best_alpha
-
-    print("Best parameters found for the model: ", grid_search.best_params_)
-
-# Example usage
-model_param_grid = {
-    'estimator__alpha': [100, 300, 500],
-}
-
-beginning_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-
+"""
 simulation_data = test_data_copy  # Assuming this is defined with your actual data
-start_date = '2022-05-20'
-end_date = '2024-03-20'  # Define an end date
-
-start_date = pd.to_datetime(start_date).tz_localize(None)
-end_date = pd.to_datetime(end_date).tz_localize(None)
-
-
-
-simulation = RL_VaultSimulator(simulation_data, simulation_data, features, targets, temporals, start_date, end_date)
-simulation.train_model()
-best_alpha = tune_model_hyperparameters(simulation, model_param_grid)
-
-# Manually set simulator-specific parameters
-simulation.scale_factor = 300000000  # Example value
-simulation.minimum_value_factor = 0.05  # Example value
-simulation.volatility_window = 250  # Example value
-
-# Run the simulation
-simulation.run_simulation(start_date)
-#simulation.plot_simulation_results()
-
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import Pipeline
-
-def custom_grid_search(simulator, param_grid):
-    kf = KFold(n_splits=3, shuffle=True, random_state=42)
-    best_params = None
-    best_score = float('inf')
-
-    for scale_factor in param_grid['scale_factor']:
-        for minimum_value_factor in param_grid['minimum_value_factor']:
-            for window in param_grid['volatility_window']:
-                for lp_volatility_scale in param_grid['lp_volatility_scale']:  # New parameter for LP volatility scale
-                    scores = []
-
-                    for train_index, test_index in kf.split(simulator.initial_data):
-                        train_data = simulator.initial_data.iloc[train_index]
-                        test_data = simulator.initial_data.iloc[test_index]
-
-                        temp_simulator = RL_VaultSimulator(
-                            train_data,
-                            simulator.initial_data,
-                            simulator.features,
-                            simulator.targets,
-                            simulator.temporals,
-                            simulator.start_date,
-                            simulator.end_date,
-                            scale_factor=scale_factor,
-                            minimum_value_factor=minimum_value_factor,
-                            volatility_window=window,
-                            lp_volatility_scale=lp_volatility_scale  # Pass the new parameter
-                        )
-
-                        temp_simulator.train_model()
-                        temp_simulator.run_simulation(simulator.start_date)
-
-                        # Reindex results to match test_data index
-                        y_pred = temp_simulator.results.reindex(test_data.index)
-                        y_true = test_data[simulator.targets]
-
-                        # Drop rows with NaN values that might have been introduced by reindexing
-                        common_index = y_pred.dropna().index
-                        y_pred = y_pred.loc[common_index]
-                        y_true = y_true.loc[common_index]
-
-                        score = mean_squared_error(y_true, y_pred)
-                        scores.append(score)
-
-                    mean_score = np.mean(scores)
-                    if mean_score < best_score:
-                        best_score = mean_score
-                        best_params = {
-                            'scale_factor': scale_factor,
-                            'minimum_value_factor': minimum_value_factor,
-                            'volatility_window': window,
-                            'lp_volatility_scale': lp_volatility_scale  # Include new parameter in best_params
-                        }
-
-    return best_params, best_score
-
-
-# Usage example
-simulation_data = test_data_copy
-if simulation_data.index.tz is not None:
-    simulation_data.index = simulation_data.index.tz_convert(None)
-else:
-    simulation_data.index = pd.to_datetime(simulation_data.index)
-
-# Now remove timezone information
-simulation_data.index = simulation_data.index.tz_localize(None)
-
-# Define the parameter grid
-param_grid = {
-    'scale_factor': [10000000, 50000000, 100000000, 300000000, 453000000],
-    'minimum_value_factor': [0.001, 0.008, 0.05, 0.1, 0.12],
-    'volatility_window': [60, 150, 180, 250, 280, 360, 380],
-    'lp_volatility_scale': [0.5, 0.65, 0.7, 0.75, 1.0]  # Add lp_volatility_scale options here
-}
-
-
-# Usage example
+simulation_data.index = simulation_data.index.tz_localize(None)  # Remove timezone information
 start_date = '2022-05-20'
 end_date = '2024-03-20'
 
-simulation = RL_VaultSimulator(simulation_data, simulation_data, features, targets, temporals, start_date, end_date)
+simulation = RL_VaultSimulator(simulation_data, simulation_data, features, targets, temporals, start_date, end_date, scale_factor=300000000, minimum_value_factor=0.05, volatility_window=250)
 simulation.train_model()
-best_params, best_score = custom_grid_search(simulation, param_grid)
-
-finish_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-# Assuming grid_search is the object from GridSearchCV
-results = {
-    "best_params": best_params,
-    "best_score": best_score,
-    "best_alpha": best_alpha,
-    "beginning_timestamp": beginning_timestamp,
-    "finish_timestamp": finish_timestamp
-}
-
-# Convert to DataFrame
-results_df = pd.DataFrame([results])
-
-# Save to CSV
-results_df.to_csv('data/csv/grid_search_results.csv', index=False)
+simulation.run_simulation(start_date)
+simulation.plot_simulation_results()
 
 
-print("Best parameters found: ", best_params), print("Best score: ", best_score), print("Best gridsearch params", best_alpha)
+# Plot Dai ceilings and USD balances
+vault_names = ['ETH', 'stETH', 'BTC', 'Altcoin', 'Stablecoin', 'LP', 'PSM', 'RWA']
+simulation.plot_dai_ceilings_and_usd_balances(start_date, vault_names)
+
+# Calculate error metrics against actual data (if available)
+# simulation.calculate_error_metrics(actual_data)
+
+
+# result = simulation.results
+# evaluate_predictions(result, historical)
+
+# ### Filter for MVO
+
+# In[852]:
+
+
+historical_data = historical[historical.index <= '2022-05-19']
+
+
+# In[853]:
+
+
+historical_data_mvo = historical_data.copy()
+
+historical_data_mvo.index= historical_data_mvo.index.tz_localize(None)
+
+
+# In[854]:
+
+
+result.index
+
+
+# In[855]:
+
+
+combined_data = pd.concat([historical_data_mvo, result])
+
+# Optional: Sort the DataFrame by index if it's not already sorted
+combined_data.sort_index(inplace=True)
+
+# Now 'combined_data' contains both historical and simulation data in one DataFrame
+print(combined_data)
+
+
+# In[856]:
+
+
+historical_comparison = historical[historical.index <= '2022-06-12']
+historical_comparison
+
+
+# In[857]:
+
+
+result
+"""

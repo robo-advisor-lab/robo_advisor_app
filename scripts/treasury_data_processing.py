@@ -53,7 +53,7 @@ tbill = pd.read_csv(tbill_path)
 tbill['decimal'] = tbill['TB3MS'] / 100
 current_risk_free = tbill['decimal'].iloc[-1]
 
-assets_path = 'data/csv/asset_prices.csv'
+assets_path = 'data/csv/asset_prices2.csv'
 assets = pd.read_csv(assets_path)
 assets.dropna(inplace=True)
 all_assets = assets.copy()
@@ -98,6 +98,9 @@ panamadao_returns.drop(columns=columns_to_drop, inplace=True)
 
 cowdao_path = 'data/csv/cowdao_returns.csv'
 
+
+
+
 panama_dao_assets = panamadao_returns['SYMBOL'].unique()
 
 def calculate_historical_returns(panamadao_returns):
@@ -132,6 +135,8 @@ def calculate_historical_returns(panamadao_returns):
     historical_cumulative_return = weighted_daily_log_returns[['DAY', 'cumulative_return']]
     
     return historical_returns, historical_cumulative_return
+
+
 
 historical_returns, historical_cumulative_return = calculate_historical_returns(panamadao_returns)
 base_return = historical_cumulative_return.copy()

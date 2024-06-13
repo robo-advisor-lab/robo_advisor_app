@@ -1,0 +1,2 @@
+num runs,seeds,avg rl cumulative return,average rl TVL,average rl sortino ratio
+10,"[5, 10, 15, 20, 40, 100, 200, 300, 500, 800]",-0.19622548768131773,10629002211.24141,-0.22937436041537979

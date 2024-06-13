@@ -180,8 +180,17 @@ class mvo_model():
                     print(f"No optimal weights found for historical period up to {start}")
                     continue
     
-                current_composition = np.round(current_composition, decimals=10)
-                optimal_weights = np.round(optimal_weights, decimals=10)
+                # Clip weights to be within 0 and 1
+                optimal_weights = np.clip(optimal_weights, 0, 1)
+                for i in range(len(optimal_weights)):
+                    if i != eth_index and optimal_weights[i] > 0.3:
+                        optimal_weights[i] = 0.3
+    
+                # Ensure ETH weight is at least the specified bound
+                if self.eth_bound > 0 and optimal_weights[eth_index] < self.eth_bound:
+                    optimal_weights[eth_index] = self.eth_bound
+    
+                optimal_weights /= np.sum(optimal_weights)  # Normalize to sum to 1
     
                 weight_changes = np.abs(current_composition - optimal_weights)
                 significant_changes = weight_changes >= self.threshold
@@ -211,5 +220,3 @@ class mvo_model():
         rebalanced_data = rebalanced_data[rebalanced_data.index >= self.start_date].iloc[:-1]
     
         return rebalanced_data
-    
-        

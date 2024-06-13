@@ -198,7 +198,7 @@ class SimulationEnvironment:
         self.action_log.append({'date': self.current_date, 'mvo calculated current portfolio value': total_portfolio_value.iloc[-1]})
         self.action_log.append({'date': self.current_date, 'calculated optimized weights': optimized_weights})
         self.action_log.append({'date': self.current_date, 'current composition': composition.iloc[-1]})
-
+    
         if self.agent is None:
             current_weights = composition.iloc[-1].to_dict()
             target_weights = {k: v for k, v in zip(composition.columns, optimized_weights)}
@@ -209,7 +209,7 @@ class SimulationEnvironment:
             target_weights = self.agent.target_weights
             self.action_log.append({'date': self.current_date, 'agent weights updated to': target_weights})
             print('Agent weights updated:', target_weights)
-
+    
         current_daily_returns, current_downside_returns, current_excess_returns, current_sortino_ratio = historical_sortino(returns, composition)
         self.action_log.append({'date': self.current_date, 'current sortino ratio': current_sortino_ratio})
         target_daily_returns, target_downside_returns, target_excess_returns, target_sortino_ratio = optimized_sortino(returns, optimized_weights)
@@ -221,53 +221,50 @@ class SimulationEnvironment:
         self.action_log.append({'date': self.current_date, 'current cumulative return': cumulative_return.iloc[-1]})
         print('rl target weights for distance penalty', target_weights)
         print('current weights for distance penalty', current_weights)
-
+    
         max_distance = sum(abs(1 - value) for value in target_weights.values())
         distance_penalty = sum(abs(current_weights.get(key, 0) - value) for key, value in target_weights.items()) / max_distance if max_distance != 0 else 0
         print('distance penalty target - current', current_weights)
         self.action_log.append({'date': self.current_date, 'Distance penalty': distance_penalty})
-
-        sortino_scale = 100000
+    
+        sortino_scale = 1000
         scaled_sortino_diff = (target_sortino_ratio - current_sortino_ratio) / sortino_scale
+        reg_sortino_diff = target_sortino_ratio - current_sortino_ratio
         print('Sortino ratio:', current_sortino_ratio)
         print('Scaled Sortino diff:', scaled_sortino_diff)
         self.action_log.append({'date': self.current_date, 'Scaled Sortino diff': scaled_sortino_diff})
-
+    
         # Calculate the percentage change in total portfolio value
         if self.previous_total_portfolio_value is not None:
             portfolio_value_change_pct = (total_portfolio_value.iloc[-1] - self.previous_total_portfolio_value) / self.previous_total_portfolio_value
         else:
             portfolio_value_change_pct = 0  # No change if there is no previous value
-        
+    
         # Scale the portfolio value change percentage
         scaled_portfolio_value_change = portfolio_value_change_pct * self.value_change_factor
         print('port change pct', portfolio_value_change_pct)
         print('scaled port change', scaled_portfolio_value_change)
-        
+    
         # Update the previous total portfolio value
         self.previous_total_portfolio_value = total_portfolio_value.iloc[-1]
-        
-        # Incorporate the scaled percentage change in total portfolio value into the reward
-        reward = scaled_sortino_diff - distance_penalty + scaled_portfolio_value_change
-        reward_no_scale = current_sortino_ratio - distance_penalty + scaled_portfolio_value_change
-        sortino_reward = current_sortino_ratio - 10*distance_penalty
-        
+    
+        # Apply different scaling based on the strategy type
+        #if self.agent.reward_type == 'Aggressive':
+            #reward = (scaled_sortino_diff * 10) - distance_penalty
+            #print('aggressive reward', reward)
+        #else:
+        reward = (scaled_sortino_diff * 5) - (distance_penalty * 2) + scaled_portfolio_value_change
+        print('balanced reward', reward)
+    
         self.action_log.append({'date': self.current_date, 'Reward': reward})
-        self.action_log.append({'date': self.current_date, 'Reward no scale': reward_no_scale})
-        self.action_log.append({'date': self.current_date, 'sortino reward': sortino_reward})
-
-        self.dai_ceiling = self.simulator.data[dai_ceilings]
-        self.action_log.append({'date': self.current_date, 'dai ceilings': self.dai_ceiling})
-        print('reward no scale', reward_no_scale)
-        print('sortino reward', sortino_reward)
+        self.action_log.append({'date': self.current_date, 'Distance penalty': distance_penalty})
+        self.action_log.append({'date': self.current_date, 'Scaled Sortino diff': scaled_sortino_diff})
+        self.action_log.append({'date': self.current_date, 'Portfolio change': scaled_portfolio_value_change})
         self.action_log.append({'date': self.current_date, 'reward type': self.agent.reward_type})
-        if self.agent.reward_type == 'Aggressive':
-            
-            print('aggressive reward', sortino_reward)
-            return sortino_reward, current_weights
-        else:
-            print('balanced reward', reward_no_scale)
-            return reward_no_scale, current_weights
+        
+        return reward, current_weights
+
+
             
 
 """

@@ -25,12 +25,13 @@ import plotly.express as px
 from models.treasury_mvo_model import mvo_model
 from models.treasury_rl_model import PortfolioEnv, train_rl_agent
 from scripts.treasury_utils import calculate_sortino_ratio, calculate_treynor_ratio, calculate_cagr, calculate_beta, normalize, calculate_log_returns
-from scripts.treasury_data_processing import mvo_combined_assets, combined_all_assets, panama_dao_start_date, current_risk_free, historical_normalized_returns, historical_cumulative_return, historical_returns as treasury_historical_portfolio_returns, pivot_data_filtered, pivot_assets, index_start, indicies, tbill, combined_assets, panamadao_returns, calculate_historical_returns, iniital_composition as panama_dao_initial_comp
+from scripts.treasury_data_processing import mvo_combined_assets, combined_all_assets, panama_dao_start_date, current_risk_free, historical_normalized_returns, historical_cumulative_return, historical_returns as treasury_historical_portfolio_returns, pivot_data_filtered, pivot_assets, index_start, indicies, tbill, combined_assets, panamadao_returns, calculate_historical_returns, iniital_composition as panama_dao_initial_comp, combined_assets
 
 # Vault Advisor
 from models.vault_mvo_agent import MVOAgent
 from models.vault_rl_agent import RlAgent
 from scripts.simulation import RL_VaultSimulator
+from scripts.mvo_simulation import MVO_VaultSimulator
 from scripts.environment import SimulationEnvironment
 from scripts.vault_data_processing import test_data, targets, features, temporals, dai_ceilings, vault_names, key_mapping
 from scripts.vault_utils import mvo, historical_sortino, visualize_mvo_results, evaluate_predictions, generate_action_space, calc_cumulative_return, evaluate_multi_predictions, abbreviate_number
@@ -152,6 +153,12 @@ def vault_advisor(start_date, end_date, bounds, seed, reward_type, initial_strat
     if end_date is not type(str):
         end_date = str(end_date)
         
+    if reward_type == 'Aggressive':
+        adjustment_scale = 15
+    else:
+        adjustment_scale = 15
+
+    #st.sidebar.write(f"reward type: {reward_type}, adjustment scale: {adjustment_scale}")
     portfolio_mvo_weights, portfolio_returns, portfolio_composition, total_portfolio_value = mvo(simulation_data, st.session_state['vault_bounds'])
     
         
@@ -159,14 +166,14 @@ def vault_advisor(start_date, end_date, bounds, seed, reward_type, initial_strat
     optimized_weight_dict = dict(zip(vault_names, portfolio_mvo_weights))
     #st.sidebar.write('Initial Strategy:', optimized_weight_dict)
     vault_action_ranges = {
-        'stETH Vault_dai_ceiling': [-0.4, 0.4],
-        'ETH Vault_dai_ceiling': [-0.5, 0.5],
-        'BTC Vault_dai_ceiling': [-0.5, 0.5],
+        'stETH Vault_dai_ceiling': [-0.5, 0.5],
+        'ETH Vault_dai_ceiling': [-1, 0.5],
+        'BTC Vault_dai_ceiling': [-1, 0.5],
         'Altcoin Vault_dai_ceiling': [-0.1,0.1],
         'Stablecoin Vault_dai_ceiling': [-0.1, 0.1],
-        'LP Vault_dai_ceiling': [-0.15,0.15],
+        'LP Vault_dai_ceiling': [-0.1,0.1],
         'RWA Vault_dai_ceiling': [0, 0],
-        'PSM Vault_dai_ceiling': [-0.5, 0.5]
+        'PSM Vault_dai_ceiling': [-1, 0.5]
     }
     action_space = generate_action_space(vault_action_ranges)
     
@@ -175,7 +182,7 @@ def vault_advisor(start_date, end_date, bounds, seed, reward_type, initial_strat
 
     # RL Model
     st.sidebar.write("Starting RL agent training...")
-    rfl_agent = RlAgent(action_space, optimized_weight_dict, vault_action_ranges, reward_type, initial_strategy_period)
+    rfl_agent = RlAgent(action_space=action_space, target_weights = optimized_weight_dict, vault_action_ranges = vault_action_ranges, reward_type = reward_type, initial_strategy_period = initial_strategy_period, adjustment_scale=adjustment_scale)
     initial_action_rl = rfl_agent.initial_strategy(initial_weights)
     rl_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     rl_simulator.train_model()
@@ -190,9 +197,9 @@ def vault_advisor(start_date, end_date, bounds, seed, reward_type, initial_strat
 
     # MVO Model
     st.sidebar.write("Starting MVO agent training...")
-    mevo_agent = MVOAgent(action_space, optimized_weight_dict, vault_action_ranges, initial_strategy_period)
+    mevo_agent = MVOAgent(action_space=action_space, target_weights = optimized_weight_dict, vault_action_ranges = vault_action_ranges, initial_strategy_period = initial_strategy_period, adjustment_scale=adjustment_scale)
     initial_action_mvo = mevo_agent.initial_strategy(initial_weights)
-    mvo_simulator = RL_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
+    mvo_simulator = MVO_VaultSimulator(simulation_data, test_data, features, targets, temporals, start_date, end_date, scale_factor=453000000, minimum_value_factor=0.008, volatility_window=250)
     mvo_simulator.train_model()
     mvo_environment = mvo_sim_environment(mvo_simulator, start_date, end_date, mevo_agent,bounds)
     mvo_environment.reset()
@@ -367,14 +374,15 @@ else:
               'RWA Vault_collateral_usd', 'PSM Vault_collateral_usd']
     vault_total_cycles = vault_sim_total_days / 24
     initial_strategy_period = st.sidebar.number_input('Initial Strategy Period', min_value=0, max_value=10, value=1)
-    reward_type = st.sidebar.radio('Reward Type', ['Balanced', 'Aggressive'], index=0)
+    #reward_type = st.sidebar.radio('Reward Type', ['Balanced', 'Aggressive'], index=0)
     bounds = get_user_bounds()
     #st.sidebar.write('total days', vault_sim_total_days)
     
     #st.sidebar.write('max 24 day cycles', int(vault_total_cycles))
     st.session_state['vault_bounds'] = bounds
+    treasury_starting_date = panama_dao_start_date 
     
-    
+reward_type = 'Balanced'   
     
     
     #st.session_state['eth_bound'] = eth_bound
@@ -519,8 +527,8 @@ with tabs[1]:
 
 
             rl_sortino_timeseries = rl_action_df['current sortino ratio'].dropna()
-            reward_balanced = rl_action_df['Reward no scale'].dropna()
-            reward_aggressive = rl_action_df['sortino reward'].dropna()
+            reward_balanced = rl_action_df['Reward'].dropna()
+            #reward_aggressive = rl_action_df['sortino reward'].dropna()
             reward_types_list = rl_action_df['reward type'].dropna()
             #st.write('balanced rewards', reward_balanced)
             #st.write('aggressive rewards',reward_aggressive)
@@ -573,11 +581,13 @@ with tabs[1]:
         #st.dataframe(historical_returns)
         vcol1, vcol2, vcol3 = st.columns(3)
         with vcol1:
+            #st.write(rl_total_portfolio_value.iloc[-1])
             st.metric(label="RL current portfolio value", value=f"${abbreviate_number(rl_total_portfolio_value.iloc[-1])}")
             st.metric(label="RL Cumualtive Return", value=f"{rl_optimized_returns.iloc[-1]*100:.2f}%")
             st.metric(label="RL sortino ratio", value=f"{rl_sim_sortino_ratio:.2f}")
         
         with vcol2:
+            #st.write(mvo_total_portfolio_value.iloc[-1])
             st.metric(label="MVO current portfolio value", value=f"${abbreviate_number(mvo_total_portfolio_value.iloc[-1])}")
             st.metric(label="MVO Cumulative Return", value=f"{mvo_optimized_returns.iloc[-1]*100:.2f}%")
             st.metric(label="MVO sortino ratio", value=f"{mvo_sim_sortino_ratio:.2f}")
@@ -586,6 +596,7 @@ with tabs[1]:
         #st.write(f"{historical_returns.index.min()} - {historical_returns.index.max()}")
         
         with vcol3:
+            #st.write(historical_total_portfolio_value.iloc[-1])
             st.metric(label="Historical current portfolio value", value=f"${abbreviate_number(historical_total_portfolio_value.iloc[-1])}")
             st.metric(label="Historical Cumulative Return", value=f"{historical_returns.iloc[-1]*100:.2f}%")
             st.metric(label="Historical sortino ratio", value=f"{historical_sortino_ratio:.2f}")
@@ -783,6 +794,24 @@ with tabs[1]:
 with tabs[2]:
     st.header("Treasury Robo Advisor")
     st.markdown("**Backtesting to PanamaDAO Historical Data**")
+    start_data = combined_all_assets[combined_all_assets.index == pd.to_datetime(treasury_starting_date)].iloc[0]
+    composition_columns = [f'COMPOSITION_{asset}' for asset in combined_assets]
+    starting_composition = start_data[composition_columns]
+    panama_dao_initial_comp = starting_composition
+    panama_dao_initial_comp.index = panama_dao_initial_comp.index.str.replace('COMPOSITION_', '', regex=False)
+    #st.write(panama_dao_initial_comp)
+
+    fig_initial_comp = px.pie(
+        names=panama_dao_initial_comp.index,
+        values=panama_dao_initial_comp.values,
+        title=f"Initial Composition as of {pd.to_datetime(treasury_starting_date)}"
+    )
+    #st.write(panama_dao_initial_comp)
+    st.plotly_chart(fig_initial_comp)
+    #iniital_composition.plot.pie(figsize=(10, 10), autopct='%1.1f%%')
+
+    #st.write('Selected Assets:', selected_assets)
+    #st.write('ETH Bound', eth_bound)
     
     if 'treasury_rl' in st.session_state or 'treasury_mvo' in st.session_state:
         selected_assets = st.session_state['selected_assets'] 
@@ -1010,6 +1039,7 @@ with tabs[2]:
             return cleaned_values
         
         composition_columns = [f'COMPOSITION_{asset}' for asset in selected_assets]
+        price_columns = [f'DAILY_PRICE_{asset}' for asset in selected_assets]
         #st.write('composition columns', composition_columns)
         mvo_comp = rebalanced_data[composition_columns]
         mvo_comp.columns = mvo_comp.columns.str.replace('COMPOSITION_', '', regex=False)
@@ -1108,6 +1138,8 @@ with tabs[2]:
     
     
         mvo_comp = rebalanced_data[composition_columns]
+        #st.write('mvo comp', mvo_comp)
+        #st.write('prices', rebalanced_data[price_columns] )
         mvo_comp.index = pd.to_datetime(mvo_comp.index)
         #st.write(mvo_comp)
         mvo_comp = mvo_comp[mvo_comp.index > comp_start]
@@ -1334,6 +1366,7 @@ with tabs[2]:
             #st.metric(label="Defi Index Cumulative Risk Premium", value=f"{defi_index_cumulative_risk_premium * 100:.2f}%")
             
             sirloin_history = combined_indicies['SIRLOIN_INDEX']
+            benchmark_history = sirloin_history
             benchmark_cagr = calculate_cagr(sirloin_history)
             cumulative_risk_premium = benchmark_cagr - current_risk_free
             index = "Sirloin Index"
@@ -1356,6 +1389,7 @@ with tabs[2]:
             prices = pivot_assets.copy()
             prices.set_index('DAY', inplace=True)
             dpi_history = prices['DAILY_PRICE_DPI']
+            benchmark_history = dpi_history
             #st.dataframe(dpi_history)
             dpi_returns = calculate_log_returns(dpi_history)
             dpi_history_cum = np.exp(np.log1p(dpi_returns).cumsum()) - 1
@@ -1428,10 +1462,16 @@ with tabs[2]:
             st.metric(label="Historical Beta", value=f"{historical_beta:.2f}")
             st.metric(label="Historical CAGR", value=f"{historical_cagr * 100:.2f}%")
         with st.expander(f"{index} as Benchmark"):
-            st.metric(label=f"{index} CAGR", value=f"{benchmark_cagr * 100:.2f}%")
-            #st.write(tbill)
-            st.metric(label=f"Risk Free Rate (3 Month Tbill) as of {tbill['DATE'].iloc[-1]}:" , value=f"{current_risk_free * 100:.2f}%")
-            st.metric(label=f"{index} Cumulative Risk Premium", value=f"{cumulative_risk_premium * 100:.2f}%")
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                st.metric(label=f"{index} CAGR", value=f"{benchmark_cagr * 100:.2f}%")
+                #st.write(tbill)
+                st.metric(label=f"Risk Free Rate (3 Month Tbill) as of {tbill['DATE'].iloc[-1]}:" , value=f"{current_risk_free * 100:.2f}%")
+                st.metric(label=f"{index} Cumulative Risk Premium", value=f"{cumulative_risk_premium * 100:.2f}%")
+
+            with bcol2:
+                st.write(f"{index} History")
+                st.line_chart(benchmark_history)
     
     
         

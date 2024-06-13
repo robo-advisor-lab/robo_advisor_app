@@ -129,17 +129,18 @@ class PortfolioEnv(gym.Env):
             self.portfolio = normalize_portfolio(action)
             
             # Ensure ETH allocation meets the minimum bound if specified
-            if self.portfolio[self.eth_index] < self.eth_bound:
-                diff = self.eth_bound - self.portfolio[self.eth_index]
-                remaining_allocation = 1 - self.eth_bound
-                self.portfolio[self.eth_index] = self.eth_bound
-                other_weights = np.delete(self.portfolio, self.eth_index)
-                other_weights = other_weights / np.sum(other_weights) * remaining_allocation
-                self.portfolio = np.insert(other_weights, self.eth_index, self.eth_bound)
-                self.portfolio = normalize_portfolio(self.portfolio)
-    
-            self.previous_action = self.portfolio
-            self.actions_log.append((self.data.index[self.current_step], self.portfolio))
+            if self.eth_index != None:
+                if self.portfolio[self.eth_index] < self.eth_bound:
+                    diff = self.eth_bound - self.portfolio[self.eth_index]
+                    remaining_allocation = 1 - self.eth_bound
+                    self.portfolio[self.eth_index] = self.eth_bound
+                    other_weights = np.delete(self.portfolio, self.eth_index)
+                    other_weights = other_weights / np.sum(other_weights) * remaining_allocation
+                    self.portfolio = np.insert(other_weights, self.eth_index, self.eth_bound)
+                    self.portfolio = normalize_portfolio(self.portfolio)
+        
+                self.previous_action = self.portfolio
+                self.actions_log.append((self.data.index[self.current_step], self.portfolio))
     
         self.composition_log.append((self.data.index[self.current_step], self.portfolio.copy()))
     
