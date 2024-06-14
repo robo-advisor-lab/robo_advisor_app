@@ -1,8 +1,10 @@
-# DAO Robo Advisor Whitepaper
+---
+description: Work In Progress as of 6/14/2024
+---
 
-## DAO Robo Advisor Whitepaper
+# DAO Robo Advisor Whitepaper (WIP)
 
-#### Executive Summary
+## Executive Summary
 
 **Purpose**
 
@@ -16,7 +18,11 @@ DAO treasury management faces challenges such as inefficiencies, high risks, and
 
 The Vault Robo Advisor and Treasury Robo Advisor offer advanced portfolio management solutions using Mean-Variance Optimization (MVO) and Reinforcement Learning (RL) to achieve superior performance metrics like improved Sortino and Sharpe ratios, and optimized asset allocations.
 
-#### Introduction
+**Revenue Model**&#x20;
+
+The DAO Lab will generate revenue through these robo advisory products by implementing performance fees. These fees will be a percentage of the profits generated from the optimized portfolio management provided by the advisors. Additionally, a small management fee may be applied to cover operational costs, ensuring the sustainability and continuous improvement of the advisory services.
+
+## Introduction
 
 **Background on DAO Treasury Management**
 
@@ -44,9 +50,9 @@ The Treasury Robo Advisor provides a comprehensive solution for direct portfolio
 * **Volatility**: Without advanced models, portfolios are exposed to unnecessary risks.
 * **Scalability Issues**: Traditional methods are not scalable for large and diverse portfolios.
 
-#### Proposed Solutions
+## Proposed Solutions
 
-**Vault Robo Advisor**
+### **Vault Robo Advisor**
 
 **Model Description**
 
@@ -65,7 +71,7 @@ The Vault Robo Advisor uses DAI ceiling adjustments to achieve optimal portfolio
 
 * **See Vault Robo Advisor Results page.**
 
-**Treasury Robo Advisor**
+### **Treasury Robo Advisor**
 
 **Model Description**
 
@@ -79,7 +85,7 @@ Unlike the Vault Robo Advisor, this model directly rebalances the portfolio, mak
 
 * **See Treasury Robo Advisor Results page.**
 
-**Technical Implementation**
+## **Technical Implementation**
 
 **Layer 2 Blockchain Integration**
 
@@ -94,7 +100,7 @@ The advisors will be integrated with Layer 2 solutions to minimize transaction f
 
 Robust security measures and transparent processes ensure the integrity and trustworthiness of the advisors.
 
-**Benefits and Impact**
+## **Benefits and Impact**
 
 **Advantages for DAOs and Investors**
 
@@ -106,7 +112,7 @@ Robust security measures and transparent processes ensure the integrity and trus
 
 The implementation of these advisors sets a new standard for treasury management, contributing to the overall stability and growth of the DeFi ecosystem.
 
-**Future Work and Roadmap**
+## **Future Work and Roadmap**
 
 **Upcoming Features and Developments**
 
@@ -127,7 +133,7 @@ The implementation of these advisors sets a new standard for treasury management
 * **DAO Lab as Development Organization**: Community-driven development for continuous improvement. Individuals can earn governance NFT through doing tasks for the DAO, such as having a commit to the GitHub approved by the DAO, or submitting optimal run data for model training.
 * **Partnerships with Other DAOs and DeFi Projects**: Collaborative growth and innovation.
 
-**Conclusion**
+## **Conclusion**
 
 **Summary of Key Points**
 
