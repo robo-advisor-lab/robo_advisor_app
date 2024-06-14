@@ -435,7 +435,7 @@ with tabs[0]:
     
     ### Resources
 
-    - [Whitepaper (WIP)](https://robo-advisor-labs.gitbook.io/dao-robo-advisor-whitepaper)
+    - [Whitepaper (WIP)](https://robo-advisor-labs.gitbook.io/dao-robo-advisor-whitepaper/dao-robo-advisor-whitepaper)
     - For more information on the indicies:
         - DeFi and Non-DeFi Treasury indicies can be found at this [flipside dashboard](https://flipsidecrypto.xyz/Brandyn/dao-treasury-returns-Y2F8vX).
         - [Sirloin Index](https://dune.com/queries/2233092) can be found here.  Accompanying dashboard for DAO Benchmarks [here](https://dune.com/steakhouse/howmuchubench). 
