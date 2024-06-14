@@ -1,5 +1,5 @@
 ---
-description: Whitepaper for DAO Robo Advisors
+description: 'Whitepaper for DAO Robo Advisors: https://daoroboadvisor.streamlit.app/'
 ---
 
 # DAO Robo Advisor Whitepaper
@@ -148,7 +148,7 @@ The implementation of these advisors sets a new standard for treasury management
 
 #### Partnerships and Expansions
 
-* **DAO Lab as Development Organization**: Community-driven development for continuous improvement.
+* **DAO Lab as Development Organization**: Community-driven development for continuous improvement.  Individuals can earn governance NFT through doing tasks for the DAO, such as having a commit to the GitHub approved by the DAO, or submitting optimal run data for model training. &#x20;
 * **Partnerships with Other DAOs and DeFi Projects**: Collaborative growth and innovation.
 
 ### Conclusion
