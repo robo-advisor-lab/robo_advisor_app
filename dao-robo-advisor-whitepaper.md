@@ -114,7 +114,7 @@ The implementation of these advisors sets a new standard for treasury management
 * **Sharpe and Treynor Ratio Calculations**: Additional performance metrics for comprehensive evaluation.
 * **Value at Risk (VaR) and Conditional Value at Risk (CVaR)**: Advanced risk measures.
 * **Integration with More Assets**: Expanding the asset universe for broader applicability.
-* **Add dynamic rebalancing for vault model:**
+* **Add dynamic rebalancing for vault model:** The current model rebalances every 24 days; 7 day rebalancing will be tested. &#x20;
 *   **Integration of Web3 Wallets for Logging and Submission**
 
     In the future, users will have the ability to link their Web3 wallets to log their simulation runs. This feature will allow users to automatically track and record their optimal runs, which can then be submitted to the DAO Lab for evaluation and training purposes.
