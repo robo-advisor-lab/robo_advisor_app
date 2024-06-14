@@ -7,3 +7,6 @@
  ## How to run
  - Run python -r requirements.txt to download the necessary libraries.  You may need to create a new virtual environment to avoid compatibility issues.
  
+ ## For more info please see the whitepaper
+  - https://robo-advisor-labs.gitbook.io/dao-robo-advisor-whitepaper
+ 
