@@ -1,5 +1,6 @@
 # Table of contents
 
-* [DAO Robo Advisor Whitepaper](README.md)
+* [DAO Robo Advisor App](README.md)
+* [DAO Robo Advisor Whitepaper](dao-robo-advisor-whitepaper.md)
 * [Vault Robo Advisor Results](vault-robo-advisor-results.md)
 * [Treasury Robo Advisor Results](treasury-robo-advisor-results.md)
