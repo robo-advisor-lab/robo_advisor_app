@@ -136,11 +136,11 @@ MVO CAGR
 
 Historical Beta
 
-1.55
+1.74
 
 Historical CAGR
 
-49.76%
+63.39%
 
 <figure><img src=".gitbook/assets/newplot (29) (1).png" alt=""><figcaption></figcaption></figure>
 
