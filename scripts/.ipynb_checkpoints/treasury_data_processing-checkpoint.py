@@ -113,28 +113,26 @@ def calculate_historical_returns(panamadao_returns):
     # Calculate previous day price
     panamadao_returns['prev_day_price'] = panamadao_returns.groupby('SYMBOL')['DAILY_PRICE'].shift(1)
 
-    # Set first day's previous day price to current day price to get a log return of 0
+    # Set first day's previous day price to current day price to get a return of 0
     panamadao_returns.loc[panamadao_returns['prev_day_price'].isna(), 'prev_day_price'] = panamadao_returns['DAILY_PRICE']
 
-    # Calculate daily log return
-    panamadao_returns['daily_log_return'] = np.log(panamadao_returns['DAILY_PRICE'] / panamadao_returns['prev_day_price']).fillna(0)
+    # Calculate daily return
+    panamadao_returns['daily_return'] = panamadao_returns['DAILY_PRICE'] / panamadao_returns['prev_day_price'] - 1
 
-    # Calculate weighted daily log return
-    panamadao_returns['weighted_daily_return'] = (panamadao_returns['daily_log_return'] * panamadao_returns['COMPOSITION']).fillna(0)
+    # Calculate weighted daily return
+    panamadao_returns['weighted_daily_return'] = (panamadao_returns['daily_return'] * panamadao_returns['COMPOSITION']).fillna(0)
 
-    # Calculate weighted daily log return per day
-    weighted_daily_log_returns = panamadao_returns.groupby('DAY').apply(lambda x: x['weighted_daily_return'].sum()).reset_index(name='weighted_daily_return')
+    # Calculate weighted daily return per day
+    weighted_daily_returns = panamadao_returns.groupby('DAY').apply(lambda x: x['weighted_daily_return'].sum()).reset_index(name='weighted_daily_return')
 
-    # Calculate cumulative log returns
-    weighted_daily_log_returns['cumulative_log_return'] = weighted_daily_log_returns['weighted_daily_return'].cumsum().fillna(0)
+    # Calculate cumulative returns
+    weighted_daily_returns['cumulative_return'] = (1 + weighted_daily_returns['weighted_daily_return']).cumprod() - 1
 
-    # Calculate cumulative returns from cumulative log returns
-    weighted_daily_log_returns['cumulative_return'] = np.exp(weighted_daily_log_returns['cumulative_log_return']) - 1
-
-    historical_returns = weighted_daily_log_returns[['DAY', 'weighted_daily_return']]
-    historical_cumulative_return = weighted_daily_log_returns[['DAY', 'cumulative_return']]
+    historical_returns = weighted_daily_returns[['DAY', 'weighted_daily_return']]
+    historical_cumulative_return = weighted_daily_returns[['DAY', 'cumulative_return']]
     
     return historical_returns, historical_cumulative_return
+
 
 
 
@@ -450,7 +448,7 @@ prices_all_assets.pct_change().describe()
 # In[57]:
 
 
-assets_to_drop = ['G', 'HOP','CELR','CDAI','CETH','REN','STG','AAVE','FRAX','MPL','RSR','BAL','ARB','ENS']
+assets_to_drop = ['G', 'HOP','CELR','CDAI','CETH','REN','STG','AAVE','FRAX','MPL','RSR','BAL','ARB','ENS','SFRXETH']
 mvo_combined_assets = np.array([asset for asset in combined_assets if asset not in assets_to_drop])
 
 #mvo_combined_assets

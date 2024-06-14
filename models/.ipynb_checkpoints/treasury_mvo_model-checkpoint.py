@@ -113,7 +113,9 @@ class mvo_model():
     
     def calculate_cumulative_return(self, daily_portfolio_returns):
         daily_portfolio_returns = daily_portfolio_returns[daily_portfolio_returns.index >= self.start_date]
-        cumulative_return = np.exp(np.log1p(daily_portfolio_returns).cumsum()) - 1
+        #cumulative_return = np.exp(np.log1p(daily_portfolio_returns).cumsum()) - 1
+        cumulative_return = (1 + daily_portfolio_returns).cumprod() - 1
+        
         return cumulative_return
     
     def rebalance(self, data, all_assets, rebalancing_frequency=7):

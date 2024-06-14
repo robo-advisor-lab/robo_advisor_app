@@ -62,7 +62,7 @@ st.set_option('deprecation.showPyplotGlobalUse', False)
 
 #st.write(treasury_historical_portfolio_returns)
 
-#st.write(treasury_historical_portfolio_returns)
+#st.write('treasury historical returns', treasury_historical_portfolio_returns)
 
 
 #st.write(test_data[['LP Vault_market_price','Altcoin Vault_market_price','Stablecoin Vault_market_price']])
@@ -819,7 +819,9 @@ with tabs[2]:
 
         #st.write(filtered_historical_portfolio_returns)
         filtered_historical_returns = st.session_state['treasury_historical_returns']['weighted_daily_return'].iloc[:-1]
+        #st.write('filtered_historical_returns', filtered_historical_returns)
         filtered_historical_returns = pd.concat([pd.Series([0], index=[filtered_historical_returns.index.min()]), filtered_historical_returns])
+        
         filtered_historical_returns = filtered_historical_returns[~filtered_historical_returns.index.duplicated(keep='first')]
     
         #st.write(filtered_historical_returns)
@@ -827,7 +829,11 @@ with tabs[2]:
         filtered_historical_sortino = calculate_sortino_ratio(filtered_historical_returns, current_risk_free)
         #st.write('filtered historical_sortino')
         #st.write(filtered_historical_sortino)
-        filtered_cumulative_return = np.exp(np.log1p(filtered_historical_returns).cumsum()) - 1
+        #filtered_cumulative_return = np.exp(np.log1p(filtered_historical_returns).cumsum()) - 1
+        filtered_cumulative_return = (1 + filtered_historical_returns).cumprod() - 1
+        #st.write('treasury data cum return', historical_cumulative_return)
+        #st.write('comparison app cum return', filtered_cumulative_return)
+        
         #st.write('filtered cumulative return')
         #st.write(filtered_cumulative_return)
         
@@ -855,6 +861,7 @@ with tabs[2]:
             #st.write("rebalanced data", rebalanced_data)
             #st.write("mvo portfolio returns", mvo_daily_portfolio_returns)
             #st.write("historical portfolio returns", filtered_historical_returns)
+            #st.write("historical cum returns", filtered_cumulative_return)
             #st.write("rl returns", rl_portfolio_returns)
             #st.write("rl comp", composition_df)
             
@@ -1336,7 +1343,7 @@ with tabs[2]:
         
             # Layout settings
             layout = go.Layout(
-                title=f'SML',
+                title=f'Security Market Line',
                 xaxis=dict(title='Beta (Systematic Risk)'),
                 yaxis=dict(title='Return'),
                 showlegend=True

@@ -226,6 +226,7 @@ def train_rl_agent(data, all_assets, eth_bound, risk_free, rebalancing_frequency
     portfolio_values = (composition_df.values * log_price_returns.values).sum(axis=1)
     returns_df = returns_df[~returns_df.index.duplicated(keep='first')]
     rl_portfolio_returns = returns_df
+    #rl_cumulative_return = np.exp(np.log1p(rl_portfolio_returns).cumsum()) - 1
     rl_cumulative_return = (1 + rl_portfolio_returns).cumprod() - 1
 
     cumulative_return_df = rl_cumulative_return.reset_index()

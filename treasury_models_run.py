@@ -39,12 +39,12 @@ from models.treasury_mvo_model import mvo_model
 import torch
 
 
-#print('historical returns', historical_)
+print('historical returns', historical_cumulative_return)
 historical_cumulative_return.set_index("DAY", inplace=True)
-historical_returns = historical_returns['weighted_daily_return']
+historical_returns = historical_returns['weighted_daily_return'].iloc[:-1]
 
 historical_sortino_ratio = calculate_sortino_ratio(historical_returns, current_risk_free)
-historical_cumulative_return = historical_cumulative_return['cumulative_return']
+historical_cumulative_return = historical_cumulative_return['cumulative_return'].iloc[:-1]
 
 
 #seed = 100

@@ -1,0 +1,2 @@
+date,num runs,seeds,avg rl cumulative return,average rl sortino ratio,mvo cumulative return,mvo sortino,historical cumulative return,historical sortino,capm benchmark,benchmark cumulative risk prem,risk free,historical beta,historical cagr,mvo beta,mvo cagr,rl average beta,rl average cagr
+2024-06-13 18:28:42,1,[5],1.0195175360979047,2.9758247214708464,0.7398677540927394,1.5112849082140898,0.618063568798934,1.8127612431043085,sirloin index,0.3509147630433407,0.0524,1.7406146830410956,0.6338699006006245,2.1778056090119717,1.0530991859564707,2.08063673517655,1.013188185187654
