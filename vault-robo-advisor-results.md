@@ -4,11 +4,11 @@ description: v 0.1 results
 
 # Vault Robo Advisor Results
 
+### Configuration
+
 bounds = { 'BTC Vault\_collateral\_usd': (0.1, 0.3), 'ETH Vault\_collateral\_usd': (0.1, 0.5), 'stETH Vault\_collateral\_usd': (0.2, 0.3), 'Stablecoin Vault\_collateral\_usd': (0.0, 0.05), 'Altcoin Vault\_collateral\_usd': (0.0, 0.05), 'LP Vault\_collateral\_usd': (0.05, 0.05), 'RWA Vault\_collateral\_usd': (0.05, 0.05), 'PSM Vault\_collateral\_usd': (0.05, 0.2) }
 
-initial strategy =
-
-{ "BTC Vault\_collateral\_usd": 0.1, "ETH Vault\_collateral\_usd": 0.1999999999999995, "stETH Vault\_collateral\_usd": 0.3, "Stablecoin Vault\_collateral\_usd": 0.049999999999999496, "Altcoin Vault\_collateral\_usd": 0.049999999999999045, "LP Vault\_collateral\_usd": 0.05, "RWA Vault\_collateral\_usd": 0.05, "PSM Vault\_collateral\_usd": 0.2 }
+initial strategy = { "BTC Vault\_collateral\_usd": 0.1, "ETH Vault\_collateral\_usd": 0.1999999999999995, "stETH Vault\_collateral\_usd": 0.3, "Stablecoin Vault\_collateral\_usd": 0.049999999999999496, "Altcoin Vault\_collateral\_usd": 0.049999999999999045, "LP Vault\_collateral\_usd": 0.05, "RWA Vault\_collateral\_usd": 0.05, "PSM Vault\_collateral\_usd": 0.2 }
 
 vault\_action\_ranges = { 'stETH Vault\_dai\_ceiling': \[-0.5, 0.5], 'ETH Vault\_dai\_ceiling': \[-1, 0.5], 'BTC Vault\_dai\_ceiling': \[-1, 0.5], 'Altcoin Vault\_dai\_ceiling': \[-0.15,0.15], 'Stablecoin Vault\_dai\_ceiling': \[-0.1, 0.1], 'LP Vault\_dai\_ceiling': \[-0.1,0.1], 'RWA Vault\_dai\_ceiling': \[0, 0], 'PSM Vault\_dai\_ceiling': \[-1, 0.5] }
 
@@ -24,12 +24,12 @@ initial\_strategy\_period=1
 
 * avg rl cum return = -0.19
 * avg rl tvl = 10,629,002,211.
-* avg rl sortino = -0.22
+* avg rl sortino = -0.22.
 
 ### MVO Scores
 
 * mvo cum return = -0.022
-* mvo tvl = $`7195864283.12639`
+* mvo tvl = $7,195,864,283.
 * mvo sortino = -0.19
 
 ### Historical Scores
@@ -50,17 +50,19 @@ Seed = 100
 
 Initial Strategy Period = 1
 
-rl sim portfolio value as of 2024-03-20 00:00:00: `12406271373.89722`
+rl sim portfolio value as of 2024-03-20: $12,406,271,373&#x20;
 
-mvo sim portfolio value: 7624769419.518413 historical portfolio value as of 2024-03-20 00:00:00: $7,342,533,784.81
+mvo sim portfolio value as of 2024-03-20: $7,624,769,419.51
+
+historical portfolio value as of 2024-03-20: $7,342,533,784.81
 
 RL Cumualtive Return
 
-22.57%
+* 22.57%
 
 RL sortino ratio
 
-0.16
+* 0.16
 
 MVO Cumulative Return
 
