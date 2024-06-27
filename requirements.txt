@@ -1,9 +1,9 @@
-numpy
+numpy<2
 pandas
 matplotlib
 seaborn
 scikit-learn
-tensorflow  # Consider keeping a minimum version if your code relies on newer features
+tensorboard==2.16.2
 keras
 scipy
 requests
@@ -13,5 +13,5 @@ plotly
 gymnasium
 stable-baselines3
 cvxpy
-torch  # PyTorch; specify at least a minimum if certain features are essential
+torch
 inotify  # Ensure this library is what you intend; inotify itself typically isn't a Python package
