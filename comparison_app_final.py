@@ -53,7 +53,7 @@ def set_random_seed(seed):
 
 
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
+# st.set_option('deprecation.showPyplotGlobalUse', False)
 ## Treasury Advisor
 #treasury_historical_portfolio_returns.set_index('DAY', inplace=True)
 #st.write('historical returns')
